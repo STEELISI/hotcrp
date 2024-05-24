@@ -18,9 +18,9 @@ If running podman, first set `export DOCKER=podman` in your environment
 ```bash
 ./build-containers.sh
 START_MARIADB=1 ./start-containers.sh
-./dbiniit.sh # enter 'ok', 'root', 'root,' 'Y' in response to prompts
+./dbinit.sh # enter 'ok', 'root', 'root,' 'Y' in response to prompts
 ```
 
-If this works, navigate your web browser to https://localhost:8080/testconf to see the hotcrp login
+If this works, navigate your web browser to http://localhost:8080/testconf to see the hotcrp login
 page
 
