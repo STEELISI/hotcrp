@@ -612,7 +612,7 @@ class Home_Page {
         $tag = '';
         foreach ($vms as $vmid => $vminfo ){
 	
-            echo '<tr class="pl '.$tag.' k0 plnx" data-pid="'.$vmid.'" data-tags="'.$vms[$vmid]["fqdn"].'">'."\n";
+            echo '<tr class="pl '.$tag.' k0 plnx" data-pid="'.$vmid.'">'."\n";
             echo '<td class="pr pr_id">';
             echo $vmid; 
             echo '</td>';

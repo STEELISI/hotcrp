@@ -95,7 +95,20 @@ my $paperID = $ARGV[0];
 my $vmtype = $ARGV[1];
 my $vncpass = $ARGV[2];
 my $SSH = "ssh -o StrictHostKeyChecking=no";
-
+my $proj = $opt{'clusterOrg'} . "p" . $paperID;
+my $vmid = "$vmtype.$proj";
+# Check that we haven't already allocated that VM
+$sth = $dbh->prepare(
+    'SELECT * FROM VMs WHERE vmid = ?')
+    or die "prepare statement failed: $dbh->errstr()";
+$sth->execute($vmid) or die "execution failed: $dbh->errstr()";
+# If already allocated, bail out
+if ($sth->rows > 0)
+{
+    print "You have already allocated that type of VM. You can allocate a different type if you need\n";
+    print "DONE\n";
+    exit 0;
+}
 # Set server
 my $cmd="mrg config set server grpc.mod.deterlab.net";
 system($cmd);
@@ -109,7 +122,6 @@ my $output=`$cmd`;
 $cmd = "chmod g+r /tmp/merge_key 2>&1";
 $output=`$cmd`;
 # Create a project for paper if it does not exist
-my $proj = $opt{'clusterOrg'} . "p" . $paperID;
 $cmd ="mrg show project $proj";
 print "Checking if project $proj exists\n";
 my $result = system($cmd);
@@ -316,7 +328,7 @@ if ($result == 0)
 	    $sth = $dbh->prepare(
 	    'INSERT INTO VMs(vmid, vmtype, VNCpass, vmdesc, paperId) values (?, ?, ?, ?, ?)')
 		or die "prepare statement failed: $dbh->errstr()";
-	    $sth->bind_param(1, "$vmtype.$proj");
+	    $sth->bind_param(1, $vmid);
 	    $sth->bind_param(2, $vmtype);
 	    $sth->bind_param(3, $vncpass);	
 	    $sth->bind_param(4, $vms{$vmtype});

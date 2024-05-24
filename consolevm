@@ -87,16 +87,34 @@ my $cmd="mrg config set server grpc.mod.deterlab.net";
 system($cmd);
 my $proj = $opt{'clusterOrg'} . "p" . $paperID;
 my $vmid = $vmtype . "." . $proj;
+# Org owner will always have an account on VM even when they are not a reviewer or author
+$sth = $dbh->prepare(
+	'SELECT username from ClusterUsers where contactID=1')
+	or die "prepare statement failed: $dbh->errstr()";
+$sth->execute() or die "execution failed: $dbh->errstr()";
+my $ref = $sth->fetchrow_hashref();
+my $ownerusername = $ref->{'username'};
+my $hasaccess = 0;
+# Check if org owner is on the list for access to this VM
+$sth = $dbh->prepare(
+	'SELECT * FROM VMaccess vm left join ClusterUsers cu on vm.contactID=cu.contactID where vmid = ? and vm.contactID = 1')
+        or die "prepare statement failed: $dbh->errstr()";
+$sth->execute($vmid) or die "execution failed: $dbh->errstr()";
+if ($sth->rows > 0)
+{
+    $hasaccess=1;
+}
 # Calculate which terminal ID should user have
 $sth = $dbh->prepare(
-	'SELECT contactID FROM VMaccess where vmid = ? order by contactID asc ')
+	'SELECT username, vm.contactID FROM VMaccess vm left join ClusterUsers cu on vm.contactID=cu.contactID where vmid = ? order by contactID asc ')
 	or die "prepare statement failed: $dbh->errstr()";
 $sth->execute($vmid) or die "execution failed: $dbh->errstr()";
 my $i=0;
 my $found=0;
+my $username = "";
 while (my $ref = $sth->fetchrow_hashref()) {
     my $ID = $ref->{'contactID'};
-    print "My id $userID current $ID i $i\n";
+    $username = $ref->{'username'};
     if ($ID == $userID)
     {
 	$found = 1;
@@ -111,11 +129,16 @@ if ($found == 0)
     exit 1;
 }
 my $termID = $i;
+# Now check if org owner's presence on that VM intereferes with termID calculation
+if (!$hasaccess && $ownerusername lt $username)
+{
+    $termID++;
+}
 my $vncport = $termID + 5900;
 my $port = 10000 + $userID + 50*$paperID;
 my $proxyport = 6080 + $userID + 50*$paperID;
 
-print "Port $port proxyport $proxyport\n";
+print "Port $port proxyport $proxyport term ID $termID\n";
 
 my $path=$opt{'webpath'};
 my $config = "$path/config";
@@ -123,11 +146,9 @@ my $admin=$opt{'clusterUser'};
 my $logincmd =  "mrg login " . $opt{'clusterUser'} . " -p \"" . $opt{'clusterPass'} . "\"";
 $cmd = $logincmd;
 my $result=system($cmd);
-print "Result $result\n";
 $cmd = "cp $path/.ssh/merge_key /tmp/ 2>&1";
-my $output=`$cmd`;
 $cmd = "chmod g+rw /tmp/merge_key 2>&1";
-$output=`$cmd`;
+my $output=`$cmd`;
 open(my $oh, '>', $config); # or die $!;
 print $oh "
 Host *
@@ -154,7 +175,6 @@ if ($output <= 1)
 {
     # Delete known_hosts on XDC just in case
     my $xdccmd = "rm /home/" . $opt{'clusterUser'} . "/.ssh/known_hosts 2>&1";
-    print "XDC cmd $xdccmd";
     $cmd = "sudo -H -u merge ssh -F $mconfig xdc-$proj \"$xdccmd\"";
     $output=`$cmd`;
     my $result=system($cmd);
@@ -181,5 +201,4 @@ if ($output <= 1)
 	exit 1;
     }
 }
-print "User $userID term ID $termID\n";
 print "DONE";

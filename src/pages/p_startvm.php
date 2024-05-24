@@ -221,7 +221,7 @@ class StartVm_Page {
         if (!($db = $user->conf->contactdb())) {
             $db = $user->conf->dblink;
         }
-        $result = Dbl::qe($db, "SELECT * FROM VMaccess WHERE contactId = ? and vmId = ?;", $user->contactId, $vmid);
+        $result = Dbl::qe($db, "SELECT * FROM VMaccess vma left join VMs vm on vma.vmid=vm.vmid WHERE contactId = ? and vm.vmId = ?;", $user->contactId, $vmid);
         if (!$result->fetch_assoc()) {
             $qreq->print_header("Access Denied", "createvm");
 
@@ -236,13 +236,20 @@ class StartVm_Page {
 	    
 	    $_SESSION["filename"] = $_GET['createhash'];
 
+	    $vncpass = "";			  
+            foreach ($result as $vm){
+                    $vncpass = $vm['VNCpass'];
+		    echo "VNCpass " . $vncpass;
+	     }
+
+           
 	    // count the lines exist in the file
 	    $file = 'data/'. $_SESSION["filename"];
 	    $result=exec("touch " . $file);
 	    $cmd = $cmd . " 2>&1 >> " . $file;
 	    $output = shell_exec($cmd);
 	    $vncport = 6080 + $user->contactId + 50*$this->pid;
-	    $consoleurl = "http://" . $_SERVER['HTTP_HOST'] . ":" . $vncport . "/vnc.html";
+	    $consoleurl = "http://" . $_SERVER['HTTP_HOST'] . ":" . $vncport . "/vnc.html?autoconnect=true&password=" . $vncpass;
 	    echo "<script> child=window.open('" . $consoleurl . "'); child.onunload = function(){ console.log('Child window closed'); };</script>";
        	    exit;	 
     }

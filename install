@@ -1,6 +1,6 @@
 PASS="putsomethinghere"
 sudo apt update
-sudo apt install -y emacs apache2 php mariadb-server mariadb-client-core-10.6 php-fpm php-intl exim4-daemon-heavy php-mysql php-mbstring php-curl rpm at
+sudo apt install -y emacs apache2 php mariadb-server mariadb-client-core-10.6 php-fpm php-intl exim4-daemon-heavy php-mysql php-mbstring php-curl rpm at expect
 sudo a2enmod php8.1 
 sudo service apache2 restart
 #sudo mysql << eof
@@ -11,6 +11,7 @@ curl -L --output /tmp/mrg.rpm https://gitlab.com/mergetb/portal/cli/-/releases/v
 sudo rpm -i /tmp/mrg.rpm
 git clone https://github.com/novnc/noVNC
 sudo mv noVNC /var/
+cd /var/noVNC/utils && sudo openssl req -new -x509 -days 365 -nodes -out self.pem -keyout self.pem
 sudo chown -r www-data:www-data /var/noVNC
 sudo useradd -m -s /bin/bash "merge"
 echo "merge:$PASS" | sudo chpasswd

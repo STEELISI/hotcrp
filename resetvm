@@ -396,12 +396,9 @@ if ($success == 1)
                         'SELECT VNCpass FROM VMs WHERE vmid = ?')
 			or die "prepare statement failed: $dbh->errstr()";
 			$sth->execute("$vmtype.$proj") or die "execution failed: $dbh->errstr()";
-			if ($sth->rows == 0)
-			{			    
-
-			    while (my $ref = $sth->fetchrow_hashref()) {
-				$vncpass = $ref->{'VNCpass'};
-			    }
+			while (my $ref = $sth->fetchrow_hashref()) {
+			    $vncpass = $ref->{'VNCpass'};
+			    print "Will reuse vncpass $vncpass\n";
 			}
 		    }
 		}
@@ -430,6 +427,18 @@ if ($success == 1)
     if ($reachable == 1)
     {
 	# Now run runlab
+	# Check if there is vncpass we should reuse
+	$sth = $dbh->prepare(
+	    'SELECT VNCpass FROM VMs WHERE vmid = ?')
+	    or die "prepare statement failed: $dbh->errstr()";
+	$sth->execute("$vmtype.$proj") or die "execution failed: $dbh->errstr()";
+	if ($sth->rows > 0)
+	{			    
+	    while (my $ref = $sth->fetchrow_hashref()) {
+		$vncpass = $ref->{'VNCpass'};
+		print "Will reuse vncpass $vncpass\n";
+	    }
+	}
 	print "Setting up experiment\n";
 	$cmd = $logincmd . " sudo -H -u merge $SSH -F $mconfig xdc-$proj \"/share/staging/runlab -f /share/EAC -v $vncpass $vmtype\" 2>&1 < /dev/null ";
 	print $cmd;
