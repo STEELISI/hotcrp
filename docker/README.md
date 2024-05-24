@@ -21,6 +21,6 @@ START_MARIADB=1 ./start-containers.sh
 ./dbinit.sh # enter 'ok', 'root', 'root,' 'Y' in response to prompts
 ```
 
-If this works, navigate your web browser to localhost:8080/testconf to see the hotcrp login
+If this works, navigate your web browser to http://localhost:8080/testconf to see the hotcrp login
 page
 
