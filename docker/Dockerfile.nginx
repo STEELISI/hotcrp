@@ -1,0 +1,8 @@
+FROM docker.io/library/nginx:1.25.5
+
+ARG WWW_UID
+ARG WWW_GID
+
+COPY --chown=${WWW_UID}:${WWW_GID} . /var/www-data/hotcrp
+COPY docker/files/nginx.conf /etc/nginx/nginx.conf
+COPY docker/files/nginx-hotcrp.conf /etc/nginx/conf.d/default.conf
