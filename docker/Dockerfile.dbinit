@@ -1,0 +1,10 @@
+FROM docker.io/library/ubuntu:22.04
+
+RUN apt -y update && DEBIAN_FRONTEND=noninteractive apt -y install \
+    iproute2 iputils-ping \
+    mariadb-client-core-10.6 \
+    mariadb-server
+
+COPY . /hotcrp
+WORKDIR /hotcrp
+RUN /bin/bash
