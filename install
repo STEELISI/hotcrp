@@ -11,12 +11,13 @@ curl -L --output /tmp/mrg.rpm https://gitlab.com/mergetb/portal/cli/-/releases/v
 sudo rpm -i /tmp/mrg.rpm
 git clone https://github.com/novnc/noVNC
 sudo mv noVNC /var/
-cd /var/noVNC/utils && sudo openssl req -new -x509 -days 365 -nodes -out self.pem -keyout self.pem
-sudo chown -r www-data:www-data /var/noVNC
-sudo useradd -m -s /bin/bash "merge"
+openssl req -new -x509 -days 365 -nodes -out self.pem -keyout self.pem
+sudo cp self.pem /var/noVNC/utils
+sudo chown -R www-data:www-data /var/noVNC
+sudo useradd -s /bin/bash "merge"
 echo "merge:$PASS" | sudo chpasswd
 sudo chown -R "merge:merge" "/home/merge"
-sudo chmod 700 "/home/merge"
+sudo chmod 760 "/home/merge"
 sudo usermod -aG www-data merge
 echo "www-data    ALL=(merge) NOPASSWD: /usr/bin/ssh" | sudo EDITOR='tee -a' visudo
 sudo -u www-data mkdir /var/www/html/data

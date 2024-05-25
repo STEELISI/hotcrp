@@ -231,7 +231,7 @@ class StartVm_Page {
         } else {
             include_once('src/pve_api/pve_functions.php');
 
-	    $cmd = "bash fireconsolevm " . $this->pid . " " . $vmtype . " " . $user->contactId;
+	    $cmd = "perl consolevm " . $this->pid . " " . $vmtype . " " . $user->contactId;
 	    echo $cmd;
 	    
 	    $_SESSION["filename"] = $_GET['createhash'];
@@ -249,8 +249,8 @@ class StartVm_Page {
 	    $cmd = $cmd . " 2>&1 >> " . $file;
 	    $output = shell_exec($cmd);
 	    $vncport = 6080 + $user->contactId + 50*$this->pid;
-	    $consoleurl = "http://" . $_SERVER['HTTP_HOST'] . ":" . $vncport . "/vnc.html?autoconnect=true&password=" . $vncpass;
-	    echo "<script> child=window.open('" . $consoleurl . "'); child.onunload = function(){ console.log('Child window closed'); };</script>";
+	    $consoleurl = "http://" . $_SERVER['HTTP_HOST'] . ":" . $vncport . "/vnc.html";
+	    echo "<script> child=window.open('" . $consoleurl . "','_self'); child.onunload = function(){ console.log('Child window closed'); };</script>";
        	    exit;	 
     }
    

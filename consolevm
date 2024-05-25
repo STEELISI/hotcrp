@@ -141,6 +141,7 @@ my $proxyport = 6080 + $userID + 50*$paperID;
 print "Port $port proxyport $proxyport term ID $termID\n";
 
 my $path=$opt{'webpath'};
+$ENV{HOME}=$path;
 my $config = "$path/config";
 my $admin=$opt{'clusterUser'};
 my $logincmd =  "mrg login " . $opt{'clusterUser'} . " -p \"" . $opt{'clusterPass'} . "\"";
@@ -163,23 +164,25 @@ my $mconfig = "/tmp/config";
 open($oh, '>', $mconfig); # or die $!;
 print $oh "                                                                                                                                                                                                                           
 Host *	
-    IdentityFile /tmp/merge_key
+    IdentityFile /home/merge/merge_key
     ServerAliveInterval 30
     User $admin
     StrictHostKeyChecking no
     UserKnownHostsFile=/dev/null
-    ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i /tmp/merge_key -W %h:%p $admin\@jump.mod.deterlab.net";
+    ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i /home/merge/merge_key -W %h:%p $admin\@jump.mod.deterlab.net";
 close($oh);
 $output = `ps axuw | grep ssh | grep "localhost:$port " | wc | awk '{print \$1}'`;
 if ($output <= 1)
 {
     # Delete known_hosts on XDC just in case
     my $xdccmd = "rm /home/" . $opt{'clusterUser'} . "/.ssh/known_hosts 2>&1";
-    $cmd = "sudo -H -u merge ssh -F $mconfig xdc-$proj \"$xdccmd\"";
+    $cmd = "sudo -u merge ssh -F $mconfig xdc-$proj \"$xdccmd\"";
     $output=`$cmd`;
     my $result=system($cmd);
     print "Creating new SSH tunnel";
-    $cmd = "nohup sudo -H -u merge ssh -F $mconfig -L " . $port . ":localhost:" . $port . " xdc-$proj -t ssh -L " . $port . ":localhost:" . $vncport . " -N node 2>&1 </dev/null &";
+    $cmd = "cp /tmp/merge_key /home/merge/merge_key && chmod 700 /home/merge/merge_key && chown merge:merge /home/merge/merge_key";   
+    $result=system($cmd);
+    $cmd = "sudo -u merge ssh -F $mconfig -L " . $port . ":localhost:" . $port . " xdc-$proj -t ssh -L " . $port . ":localhost:" . $vncport . " -N node 2>&1 </dev/null &";
     $result=system($cmd);
     if ($result != 0)
     {
