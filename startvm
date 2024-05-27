@@ -97,15 +97,15 @@ my $vncpass = $ARGV[2];
 my $SSH = "ssh -o StrictHostKeyChecking=no";
 my $proj = $opt{'clusterOrg'} . "p" . $paperID;
 my $vmid = "$vmtype.$proj";
-# Check that we haven't already allocated that VM
-$sth = $dbh->prepare(
-    'SELECT * FROM VMs WHERE vmid = ?')
+# Check that we haven't already allocated a VM for this paper
+my $query = 'SELECT * FROM VMs WHERE vmid like \'%.' . $proj . '\'';
+$sth = $dbh->prepare($query)
     or die "prepare statement failed: $dbh->errstr()";
-$sth->execute($vmid) or die "execution failed: $dbh->errstr()";
+$sth->execute() or die "execution failed: $dbh->errstr()";
 # If already allocated, bail out
 if ($sth->rows > 0)
 {
-    print "You have already allocated that type of VM. You can allocate a different type if you need\n";
+    print "You have already allocated a VM for this paper. Please stop it before trying to allocate another one. \n";
     print "DONE\n";
     exit 0;
 }
@@ -114,13 +114,16 @@ my $cmd="mrg config set server grpc.mod.deterlab.net";
 system($cmd);
 # Log in and copy key to user merge
 my $path=$opt{'webpath'};
+$ENV{HOME}=$path;
 my $logincmd =  "mrg login " . $opt{'clusterUser'} . " -p \"" . $opt{'clusterPass'} . "\"";
 $cmd = $logincmd;
 system($cmd);
-$cmd = "cp $path/.ssh/merge_key /tmp/ 2>&1";
-my $output=`$cmd`;
-$cmd = "chmod g+r /tmp/merge_key 2>&1";
-$output=`$cmd`;
+$cmd = "cp $path/.ssh/merge_key /tmp/merge_key";
+my $result=system($cmd);
+$cmd = "sudo -H -u merge cat /tmp/merge_key > /home/merge/merge_key";
+$result=system($cmd);
+$cmd = "sudo -H -u merge chmod 600 /home/merge/merge_key";
+$result=system($cmd);    
 # Create a project for paper if it does not exist
 $cmd ="mrg show project $proj";
 print "Checking if project $proj exists\n";
@@ -250,12 +253,12 @@ my $oh;
 open($oh, '>', $mconfig) or die $!;
 print $oh "                                                                                                                                                                                                                           
 Host *	
-    IdentityFile /tmp/merge_key
+    IdentityFile /home/merge/merge_key
     ServerAliveInterval 30
     User $admin
     StrictHostKeyChecking no
     UserKnownHostsFile=/dev/null
-    ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i /tmp/merge_key -W %h:%p $admin\@jump.mod.deterlab.net";
+    ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i /home/merge/merge_key -W %h:%p $admin\@jump.mod.deterlab.net";
 close($oh);
 $cmd="mrg list xdcs | grep xdc.$proj";
 $result=system($cmd);

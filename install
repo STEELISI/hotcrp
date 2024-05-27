@@ -16,9 +16,9 @@ sudo cp self.pem /var/noVNC/utils
 sudo chown -R www-data:www-data /var/noVNC
 sudo useradd -s /bin/bash "merge"
 echo "merge:$PASS" | sudo chpasswd
-sudo chown -R "merge:merge" "/home/merge"
-sudo chmod 760 "/home/merge"
 sudo usermod -aG www-data merge
+sudo chown -R "merge:www-data" "/home/merge"
+sudo chmod 770 "/home/merge"
 echo "www-data    ALL=(merge) NOPASSWD: /usr/bin/ssh" | sudo EDITOR='tee -a' visudo
 sudo -u www-data mkdir /var/www/html/data
 sudo sed -i 's/www-data//g' /etc/at.deny

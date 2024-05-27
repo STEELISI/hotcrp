@@ -554,25 +554,27 @@ class Home_Page {
 
 	   }
             if ($user->is_admin()) {
-                $vmdata = Dbl::qe($db, "select * from VMs where active = 1");
+                $vmdata = Dbl::qe($db, "select * from VMs as v left join VMaccess as vma on v.vmId = vma.vmId left join Ports p on v.vmId = p.vmid WHERE active = 1 ORDER BY v.vmid;");
 
             } else {
-                $vmdata = Dbl::qe($db, "SELECT * FROM VMs as v left join VMaccess as vma on v.vmId = vma.vmId  WHERE contactId = ? AND active = 1 ORDER BY v.vmid;", $cid['contactId']);
+                $vmdata = Dbl::qe($db, "SELECT * FROM VMs as v left join VMaccess as vma on v.vmId = vma.vmId left join Ports p on v.vmId = p.vmid WHERE vma.contactId = ? AND active = 1 ORDER BY v.vmid;", $cid['contactId']);
             }
             foreach ($vmdata as $vm){
 	    	    $vmid = $vm['vmid'];
-		    echo "ID $vmid";
 		    $vmdesc = $vm['vmdesc'];
 		    $vms[$vmid] = array();
                     $vms[$vmid]['type'] = $vm['vmtype'];
+		    $vms[$vmid]['node'] = $vm['node'];
+		    $node = $vm['node'];
                     $vms[$vmid]['paper'] = $vm['paperId'];
 		    $createhash = random_str(15);
 		    $vms[$vmid]['pass'] = $vm['VNCpass'];
 		    $vms[$vmid]['suid'] = $suid;
 		    $vms[$vmid]['spass'] = $spass;		    
-
+		    
 		    $vms[$vmid]['started'] = $vm['create_time'];
-		    $vms[$vmid]['console'] = "<a href=\"startvm.php?type=" . $vm['vmtype'] . "&action=console&pid=" . $vm['paperId'] . "&vmid=" . $vmid . "&createhash=" . $createhash . "\" target=new>console</a>";
+		    $consoleurl = "startvm.php?type=" . $vm['vmtype'] . "&action=console&pid=" . $vm['paperId'] . "&vmid=" . $vmid . "&createhash=" . $createhash . "&node=" . $node;
+		    $vms[$vmid]['console'] = "<a href=\"#\" onclick=\"child=window.open('" . $consoleurl . "'); child.onunload = function(){ console.log('Child window closed'); };\">console</a>";
 		    $vms[$vmid]['reset'] = "<a href=\"startvm.php?type=" . $vm['vmtype'] . "&action=reset&pid=" . $vm['paperId'] . "&vmid=" . $vmid . "&createhash=" . $createhash . "\" target=new>reset</a>";
 		    $vms[$vmid]['stop'] = "<a href=\"startvm.php?type=" . $vm['vmtype'] . "&action=stop&pid=" . $vm['paperId'] . "&vmid=" . $vmid . "&createhash=" . $createhash . "\" target=new>stop</a>";		    
 		    }		 	   
@@ -589,6 +591,8 @@ class Home_Page {
                     <th class="pr plh pl_id" data-pc="id">ID
                     </th>
                     <th class="pr plh pl_type" data-pc="type">Type
+                    </th>
+	            <th class="pr plh pl_type" data-pc="type">Node
                     </th>
                     <th class="pr plh pl_status pl-status" data-pc="status">Paper #
                     </th>	  

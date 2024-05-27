@@ -1,2 +1,0 @@
-export HOME="/tmp/secret"
-nohup perl stopvm "$@" &

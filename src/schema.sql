@@ -620,6 +620,18 @@ CREATE TABLE `TopicInterest` (
   PRIMARY KEY (`contactId`,`topicId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+--
+-- Table structure for table `Ports`
+--
+
+DROP TABLE IF EXISTS `Ports`;
+CREATE TABLE `Ports` (
+  `portId` int(11) NOT NULL AUTO_INCREMENT,
+  `vmid` varchar(256) NOT NULL,
+  `contactId` int(11) NOT NULL,
+  `node` varchar(256) NOT NULL,
+  PRIMARY KEY (`portId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 --

@@ -1,2 +1,0 @@
-export HOME="/var/www/html/secret"
-nohup perl consolevm "$@" 2>&1 >/var/www/html/log &

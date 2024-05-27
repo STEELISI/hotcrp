@@ -117,15 +117,18 @@ if ($result != 0)
 }
 # Log in and copy key to user merge
 my $path=$opt{'webpath'};
+$ENV{HOME}=$path;
 my $config = "$path/config";
 my $admin=$opt{'clusterUser'};
 my $logincmd =  "mrg login " . $opt{'clusterUser'} . " -p \"" . $opt{'clusterPass'} . "\"";
 $cmd = $logincmd;
 system($cmd);
-$cmd = "cp $path/.ssh/merge_key /tmp/ 2>&1";
-my $output=`$cmd`;
-$cmd = "chmod g+r /tmp/merge_key 2>&1";
-$output=`$cmd`;
+$cmd = "cp $path/.ssh/merge_key /tmp/merge_key";
+my $result=system($cmd);
+$cmd = "sudo -H -u merge cat /tmp/merge_key > /home/merge/merge_key";
+$result=system($cmd);
+$cmd = "sudo -H -u merge chmod 600 /home/merge/merge_key";
+$result=system($cmd);    
 open(my $oh, '>', $config) or die $!;
 print $oh "
 Host *
@@ -140,12 +143,12 @@ my $mconfig = "/tmp/config";
 open(my $oh, '>', $mconfig) or die $!;
 print $oh "                                                                                                                                                                                                                           
 Host *	
-    IdentityFile /tmp/merge_key
+    IdentityFile /home/merge/merge_key
     ServerAliveInterval 30
     User $admin
     StrictHostKeyChecking no
     UserKnownHostsFile=/dev/null
-    ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i /tmp/merge_key -W %h:%p $admin\@jump.mod.deterlab.net";
+    ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i /home/merge/merge_key -W %h:%p $admin\@jump.mod.deterlab.net";
 close($oh);
 my $logincmd =  "mrg login " . $opt{'clusterUser'} . " -p \"" . $opt{'clusterPass'} . "\" && ";
 # Figure out which cluster accounts we have created before
@@ -398,7 +401,6 @@ if ($success == 1)
 			$sth->execute("$vmtype.$proj") or die "execution failed: $dbh->errstr()";
 			while (my $ref = $sth->fetchrow_hashref()) {
 			    $vncpass = $ref->{'VNCpass'};
-			    print "Will reuse vncpass $vncpass\n";
 			}
 		    }
 		}
@@ -436,14 +438,11 @@ if ($success == 1)
 	{			    
 	    while (my $ref = $sth->fetchrow_hashref()) {
 		$vncpass = $ref->{'VNCpass'};
-		print "Will reuse vncpass $vncpass\n";
 	    }
 	}
 	print "Setting up experiment\n";
 	$cmd = $logincmd . " sudo -H -u merge $SSH -F $mconfig xdc-$proj \"/share/staging/runlab -f /share/EAC -v $vncpass $vmtype\" 2>&1 < /dev/null ";
-	print $cmd;
 	$result=system($cmd);
-	print "Result $result\n";
 	if ($result != 0)
 	{
 	    print "Something failed in experiment setup\n";

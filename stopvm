@@ -90,6 +90,8 @@ system($cmd);
 my $logincmd =  "mrg login " . $opt{'clusterUser'} . " -p \"" . $opt{'clusterPass'} . "\" && ";
 my $proj = $opt{'clusterOrg'} . "p" . $paperID;
 my $vmid = $vmtype . "." . $proj;
+my $path=$opt{'webpath'};
+$ENV{HOME}=$path;
 $cmd = $logincmd . "mrg delete experiment $vmtype.$proj";
 my $result = system($cmd);
 if ($result != 0)

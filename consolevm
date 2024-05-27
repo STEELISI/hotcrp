@@ -27,11 +27,11 @@ my $SSH = "ssh -o StrictHostKeyChecking=no";
 # Take paper ID, type of VM to stop and user ID
 # and set up SSH tunnel and novnc proxy
 
-my $usage="$0 paper-ID vm-type user-ID\n";
+my $usage="$0 paper-ID vm-type user-ID node-ID\n";
 my %opt = ();
 
 
-if ($#ARGV < 2)
+if ($#ARGV < 3)
 {
     print $usage;
     print "DONE";
@@ -82,6 +82,7 @@ my $sth;
 my $paperID = $ARGV[0];
 my $vmtype = $ARGV[1];
 my $userID = $ARGV[2];
+my $nodeID = $ARGV[3];
 # Set server
 my $cmd="mrg config set server grpc.mod.deterlab.net";
 system($cmd);
@@ -134,22 +135,55 @@ if (!$hasaccess && $ownerusername lt $username)
 {
     $termID++;
 }
+# Find port numbers that would go with this instance
+$sth = $dbh->prepare(
+        'SELECT portId FROM Ports where vmid = ? and contactId = ? and node = ?')
+    or die "prepare statement failed: $dbh->errstr()";
+$sth->bind_param(1, "$vmid");
+$sth->bind_param(2, $userID);
+$sth->bind_param(3, "$nodeID");
+$sth->execute() or die "execution failed: $dbh->errstr()";
+my $offset = 0;
+if ($sth->rows > 0)
+{
+    my $ref = $sth->fetchrow_hashref();
+    $offset = $ref->{'portId'};
+}
+else
+{
+    $sth = $dbh->prepare(
+        'INSERT INTO Ports(vmid, contactId, node) values (?, ?, ?)')
+	or die "prepare statement failed: $dbh->errstr()";
+    $sth->bind_param(1, "$vmid");
+    $sth->bind_param(2, $userID);
+    $sth->bind_param(3, "$nodeID");
+    $sth->execute() or die "execution failed: $dbh->errstr()";
+    $sth = $dbh->prepare(
+        'SELECT portId FROM Ports where vmid = ? and contactId = ? and node = ?')
+	or die "prepare statement failed: $dbh->errstr()";
+    $sth->bind_param(1, "$vmid");
+    $sth->bind_param(2, $userID);
+    $sth->bind_param(3, "$nodeID");
+    $sth->execute() or die "execution failed: $dbh->errstr()";
+    my $ref = $sth->fetchrow_hashref();
+    $offset = $ref->{'portId'};
+}    
+print "Offset $offset\n";
 my $vncport = $termID + 5900;
-my $port = 10000 + $userID + 50*$paperID;
-my $proxyport = 6080 + $userID + 50*$paperID;
-
-print "Port $port proxyport $proxyport term ID $termID\n";
-
+my $port = 10000 + $offset;
+my $proxyport = 6080 + $offset;
+print "Port $port proxyport $proxyport term ID $termID offset $offset\n";
 my $path=$opt{'webpath'};
 $ENV{HOME}=$path;
 my $config = "$path/config";
 my $admin=$opt{'clusterUser'};
 my $logincmd =  "mrg login " . $opt{'clusterUser'} . " -p \"" . $opt{'clusterPass'} . "\"";
+# Log in as conf admin and as www-data user
 $cmd = $logincmd;
 my $result=system($cmd);
-$cmd = "cp $path/.ssh/merge_key /tmp/ 2>&1";
-$cmd = "chmod g+rw /tmp/merge_key 2>&1";
-my $output=`$cmd`;
+# Log in as conf admin and as merge user
+$cmd = "sudo -H -u merge " . $logincmd;
+my $result=system($cmd);
 open(my $oh, '>', $config); # or die $!;
 print $oh "
 Host *
@@ -164,24 +198,21 @@ my $mconfig = "/tmp/config";
 open($oh, '>', $mconfig); # or die $!;
 print $oh "                                                                                                                                                                                                                           
 Host *	
-    IdentityFile /home/merge/merge_key
+    IdentityFile /home/merge/.ssh/merge_key
     ServerAliveInterval 30
     User $admin
     StrictHostKeyChecking no
     UserKnownHostsFile=/dev/null
-    ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i /home/merge/merge_key -W %h:%p $admin\@jump.mod.deterlab.net";
+    ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i /home/merge/.ssh/merge_key -W %h:%p $admin\@jump.mod.deterlab.net";
 close($oh);
-$output = `ps axuw | grep ssh | grep "localhost:$port " | wc | awk '{print \$1}'`;
+my $output = `ps axuw | grep ssh | grep "localhost:$port " | wc | awk '{print \$1}'`;
 if ($output <= 1)
 {
     # Delete known_hosts on XDC just in case
     my $xdccmd = "rm /home/" . $opt{'clusterUser'} . "/.ssh/known_hosts 2>&1";
     $cmd = "sudo -u merge ssh -F $mconfig xdc-$proj \"$xdccmd\"";
-    $output=`$cmd`;
-    my $result=system($cmd);
-    print "Creating new SSH tunnel";
-    $cmd = "cp /tmp/merge_key /home/merge/merge_key && chmod 700 /home/merge/merge_key && chown merge:merge /home/merge/merge_key";   
     $result=system($cmd);
+    print "Creating new SSH tunnel";
     $cmd = "sudo -u merge ssh -F $mconfig -L " . $port . ":localhost:" . $port . " xdc-$proj -t ssh -L " . $port . ":localhost:" . $vncport . " -N node 2>&1 </dev/null &";
     $result=system($cmd);
     if ($result != 0)

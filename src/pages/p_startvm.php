@@ -95,12 +95,11 @@ class StartVm_Page {
 	    	  $id = $row[0];
 		  array_push($people, $id);
 	    }
-	    $cmd = "bash firestartvm " . $this->pid . " " . $vmtype . " " . $createhash . " ";
+	    $cmd = "perl startvm " . $this->pid . " " . $vmtype . " " . $createhash . " ";
 	    foreach ($people as $p)
 	    {
 		$cmd = $cmd . " " . $p;
        	    }
-	    echo $cmd;
 
 	    echo '<p><textarea id="startvm_log" name="startvm_log" rows="40" cols="100"></textarea><p>';
 	    echo '<p><input type="submit" value="Close" id="closeButton" style="display: none;" onclick="window.close();">';
@@ -135,8 +134,7 @@ class StartVm_Page {
 
             $qreq->print_header("Stopping the VM", "stopvm");
 
-	    $cmd = "bash firestopvm " . $this->pid . " " . $vmtype;
-	    echo $cmd;
+	    $cmd = "perl stopvm " . $this->pid . " " . $vmtype;
 	    echo '<p><textarea id="startvm_log" name="startvm_log" rows="40" cols="100"></textarea><p>';
 	    echo '<p><input type="submit" value="Close" id="closeButton" style="display: none;" onclick="window.close();">';
 	    $_SESSION["filename"] = $_GET['createhash'];
@@ -194,12 +192,11 @@ class StartVm_Page {
 	    	  $id = $row[0];
 		  array_push($people, $id);
 	    }
-	    $cmd = "bash fireresetvm " . $this->pid . " " . $vmtype . " " . $createhash . " ";
+	    $cmd = "perl resetvm " . $this->pid . " " . $vmtype . " " . $createhash . " ";
 	    foreach ($people as $p)
 	    {
 		$cmd = $cmd . " " . $p;
        	    }
-	    echo $cmd;
 	    echo '<p><textarea id="startvm_log" name="startvm_log" rows="40" cols="100"></textarea><p>';
 	    echo '<p><input type="submit" value="Close" id="closeButton" style="display: none;" onclick="window.close();">';
 	    $_SESSION["filename"] = $_GET['createhash'];
@@ -217,6 +214,7 @@ class StartVm_Page {
     function console_vm(Contact $user, Qrequest $qreq, $vmid) {
         $createhash=$_GET['createhash'];	
 	$vmtype=$_GET['type'];
+	$node=$_GET['node'];
 	
         if (!($db = $user->conf->contactdb())) {
             $db = $user->conf->dblink;
@@ -231,15 +229,13 @@ class StartVm_Page {
         } else {
             include_once('src/pve_api/pve_functions.php');
 
-	    $cmd = "perl consolevm " . $this->pid . " " . $vmtype . " " . $user->contactId;
-	    echo $cmd;
+	    $cmd = "perl consolevm " . $this->pid . " " . $vmtype . " " . $user->contactId . " " . $node;
 	    
 	    $_SESSION["filename"] = $_GET['createhash'];
 
 	    $vncpass = "";			  
             foreach ($result as $vm){
                     $vncpass = $vm['VNCpass'];
-		    echo "VNCpass " . $vncpass;
 	     }
 
            
@@ -248,7 +244,17 @@ class StartVm_Page {
 	    $result=exec("touch " . $file);
 	    $cmd = $cmd . " 2>&1 >> " . $file;
 	    $output = shell_exec($cmd);
-	    $vncport = 6080 + $user->contactId + 50*$this->pid;
+
+	    $query = "select portID from Ports WHERE vmid = \"" . $vmid . "\" and contactId = " . $user->contactId . " and node = \"" . $node . "\"";
+	    print "Query $query\n";
+	    $result = Dbl::qe($db, $query);
+
+	    while($row = $result->fetch_row())
+	    {
+		$offset = $row[0];
+	    	echo "Offset $offset\n";
+	    }
+	    $vncport = 6080 + $offset;
 	    $consoleurl = "http://" . $_SERVER['HTTP_HOST'] . ":" . $vncport . "/vnc.html";
 	    echo "<script> child=window.open('" . $consoleurl . "','_self'); child.onunload = function(){ console.log('Child window closed'); };</script>";
        	    exit;	 
