@@ -87,12 +87,15 @@ my $vmtype = $ARGV[1];
 my $cmd="mrg config set server grpc.mod.deterlab.net";
 system($cmd);
 # Call stopexp
-my $logincmd =  "mrg login " . $opt{'clusterUser'} . " -p \"" . $opt{'clusterPass'} . "\" && ";
+my $logincmd =  "mrg login " . $opt{'clusterUser'} . " -p \"" . $opt{'clusterPass'};
 my $proj = $opt{'clusterOrg'} . "p" . $paperID;
 my $vmid = $vmtype . "." . $proj;
-my $path=$opt{'webpath'};
+my $path=$opt{'webpath'} . "/secret";
 $ENV{HOME}=$path;
-$cmd = $logincmd . "mrg delete experiment $vmtype.$proj";
+# Log in as conf admin and as www-data user
+$cmd = $logincmd;
+my $result=system($cmd);
+$cmd = "mrg delete experiment $vmtype.$proj";
 my $result = system($cmd);
 if ($result != 0)
 {
@@ -101,7 +104,7 @@ if ($result != 0)
     exit 1;
 }
 # Also delete XDC
-$cmd = $logincmd . "mrg delete xdc xdc.$proj";
+$cmd = "mrg delete xdc xdc.$proj";
 $result = system($cmd);
 if ($result != 0)
 {

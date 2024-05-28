@@ -6,6 +6,46 @@ use DBI;
 
 $|=1;
 
+our @nodes = ();
+our $node = "node";
+
+sub parsenodes
+{
+    my $topofile=shift;
+    my $fh = new IO::File($topofile);
+    while(<$fh>)
+    {
+        if ($_ !~ /net\.node/)
+	{
+            next;
+        }
+	my $state = 0;
+        my @items = split /[\,\[\]\'\s]+/, $_;
+        for my $i (@items)
+	{
+	   if ($i eq "for" && $state == 0)
+	   {
+		$state = 1;
+	   }
+	   elsif ($i eq "name" && $state == 1)
+	   {	   
+		$state = 2;
+	   }
+	   elsif ($i eq "in" && $state == 2)
+           {
+                $state = 3;
+           }
+	   elsif($state == 3)
+	   {
+	       push(@nodes, $i);
+	       if ($node eq "node")
+	       {
+		   $node = $i;
+	       }		   
+	   }
+        }
+    }
+}
 
 sub randompass()
 {
@@ -112,18 +152,15 @@ if ($sth->rows > 0)
 # Set server
 my $cmd="mrg config set server grpc.mod.deterlab.net";
 system($cmd);
-# Log in and copy key to user merge
-my $path=$opt{'webpath'};
+my $path=$opt{'webpath'} . "/secret";
 $ENV{HOME}=$path;
 my $logincmd =  "mrg login " . $opt{'clusterUser'} . " -p \"" . $opt{'clusterPass'} . "\"";
+# Log in as conf admin and as www-data user
 $cmd = $logincmd;
-system($cmd);
-$cmd = "cp $path/.ssh/merge_key /tmp/merge_key";
 my $result=system($cmd);
-$cmd = "sudo -H -u merge cat /tmp/merge_key > /home/merge/merge_key";
-$result=system($cmd);
-$cmd = "sudo -H -u merge chmod 600 /home/merge/merge_key";
-$result=system($cmd);    
+# Log in as conf admin and as merge user
+$cmd = "sudo -H -u merge " . $logincmd;
+my $result=system($cmd);
 # Create a project for paper if it does not exist
 $cmd ="mrg show project $proj";
 print "Checking if project $proj exists\n";
@@ -253,14 +290,14 @@ my $oh;
 open($oh, '>', $mconfig) or die $!;
 print $oh "                                                                                                                                                                                                                           
 Host *	
-    IdentityFile /home/merge/merge_key
+    IdentityFile /home/merge/.ssh/merge_key
     ServerAliveInterval 30
     User $admin
     StrictHostKeyChecking no
     UserKnownHostsFile=/dev/null
-    ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i /home/merge/merge_key -W %h:%p $admin\@jump.mod.deterlab.net";
+    ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i /home/merge/.ssh/merge_key -W %h:%p $admin\@jump.mod.deterlab.net";
 close($oh);
-$cmd="mrg list xdcs | grep xdc.$proj";
+$cmd="mrg list xdcs | grep xdc.$proj > /dev/null";
 $result=system($cmd);
 if ($result != 0)    
 {    
@@ -304,17 +341,47 @@ if ($result != 0)
 	exit 1;
     }
 }
-
-
-
+my $custom="";
 if ($result == 0)
 {
     print "XDC exists and is running, we will now create the VM\n";
     # Now create the VM in that project
-    my $xdccmd="/share/staging/startexp -p $proj -n $vmtype -m /share/EAC/$vmtype/$vmtype.model $vmtype";
-    print "XDC command $xdccmd\n";
+    # Check if we have a custom topology
+    my $modelpath = "";
+    if ($vmtype eq "file")
+    {
+	# There is a custom topology, parse out the nodes and put them into nodes file
+	my $uploadspath=$opt{'webpath'} . "/uploads";
+	my $topofile =  $uploadspath . "/" . $vncpass . ".model";
+	parsenodes($topofile);
+	open(my $oh, ">", $uploadspath . "/" . $vncpass . ".nodes");
+	for my $n (@nodes)
+	{
+	    print $oh "$n\n";
+	}
+	close($oh);
+	$cmd = "mrg xdc scp upload " . $uploadspath . "/" . $vncpass . ".model xdc.$proj:.";
+	$result=system($cmd);
+	if ($result != 0)
+	{
+	    print "Could not upload the custom topology $vncpass.model to the testbed\n";
+	    print "DONE";
+	    exit 1;
+	}
+	# Assume second upload will work
+	$cmd = "mrg xdc scp upload " . $uploadspath . "/" . $vncpass . ".nodes xdc.$proj:.";
+	$result=system($cmd);
+	$custom="-n /home/$admin/$vncpass.nodes";
+	$modelpath = "/home/$admin/$vncpass.model";
+    }
+    else
+    {
+	$modelpath = "/share/EAC/$vmtype/$vmtype.model";
+    }
+    # Try to start the experiment
+    my $xdccmd="/share/staging/startexp -p $proj -n $vmtype -m $modelpath $vmtype";
+    print "$xdccmd\n";
     $cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"$xdccmd\"";
-
     $result=system($cmd);
     if ($result == 0)
     {
@@ -331,13 +398,35 @@ if ($result == 0)
 	    $sth = $dbh->prepare(
 	    'INSERT INTO VMs(vmid, vmtype, VNCpass, vmdesc, paperId) values (?, ?, ?, ?, ?)')
 		or die "prepare statement failed: $dbh->errstr()";
+	    my $vmdesc = "";
+	    if ($vmtype eq "file")
+	    {
+		$vmdesc="Custom topology";
+	    }
+	    else
+	    {
+		$vmdesc = $vms{$vmtype};
+		push(@nodes, $node);
+	    }
+	       
 	    $sth->bind_param(1, $vmid);
 	    $sth->bind_param(2, $vmtype);
 	    $sth->bind_param(3, $vncpass);	
-	    $sth->bind_param(4, $vms{$vmtype});
+	    $sth->bind_param(4, $vmdesc);
 	    $sth->bind_param(5, $paperID);
 	    $sth->execute or die "execution failed: $dbh->errstr()";
 	    $sth->finish;
+	    # Remember all the nodes that a user could access
+	    for my $n (@nodes)
+	    {
+		$sth = $dbh->prepare(
+		    'INSERT INTO VMnodes(vmid, node) values (?, ?)')
+		    or die "prepare statement failed: $dbh->errstr()";
+		$sth->bind_param(1, $vmid);
+		$sth->bind_param(2, $n);
+		$sth->execute or die "execution failed: $dbh->errstr()";		
+		$sth->finish;
+	    }
 	}
 	for (my $i = 3; $i <= $#ARGV; $i++)
 	{
@@ -362,6 +451,18 @@ if ($result == 0)
 		$sth->bind_param(2, $id);
 		$sth->execute or die "execution failed: $dbh->errstr()";
 		$sth->finish;
+		# Also reserve ports
+		for my $n (@nodes)
+		{
+		    $sth = $dbh->prepare(
+			'INSERT INTO Ports (vmid, contactId, node) values (?, ?, ?)')
+			or die "prepare statement failed: $dbh->errstr()";
+		    $sth->bind_param(1, "$vmtype.$proj");
+		    $sth->bind_param(2, $id);
+		    $sth->bind_param(3, $n);
+		    $sth->execute or die "execution failed: $dbh->errstr()";
+		    $sth->finish;
+		}
 	    }
 	}
     }
@@ -378,7 +479,7 @@ my $running = 0;
 for (my $tries = 0; $tries < $retries; $tries++)
 {
     print "Checking if node is reachable\n";
-    my $xdccmd="ping -c 1 node";
+    my $xdccmd="ping -c 1 $node";
     $cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"$xdccmd\"";
     open(my $cmdh, " $cmd | ");
     my $output = "";
@@ -397,7 +498,7 @@ for (my $tries = 0; $tries < $retries; $tries++)
 if ($running)
 {
     print "Setting up experiment\n";
-    $cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"/share/staging/runlab -f /share/EAC -v $vncpass $vmtype\" 2>&1 < /dev/null ";
+    $cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"/share/staging/runlab -f /share/EAC $custom -v $vncpass $vmtype\" 2>&1 < /dev/null ";
     $result=system($cmd);
     if ($result != 0)
     {

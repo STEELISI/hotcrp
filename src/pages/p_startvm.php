@@ -64,11 +64,12 @@ class StartVm_Page {
     	$createhash=$_GET['createhash'];
 	$vmtype=$_GET['vm-types'];
 	
-	
+	$topo=$_GET['topo'];
+
         if (!($db = $user->conf->contactdb())) {
             $db = $user->conf->dblink;
         }
-      	      include_once('src/pve_api/pve_functions.php');
+      	    include_once('src/pve_api/pve_functions.php');
             $qreq->print_header("Creating a New VM", "createvm");
 
 	    $people=[];
@@ -95,12 +96,16 @@ class StartVm_Page {
 	    	  $id = $row[0];
 		  array_push($people, $id);
 	    }
+	    if ($topo == "file")
+	    {
+	        $vmtype = "file";
+	    }
 	    $cmd = "perl startvm " . $this->pid . " " . $vmtype . " " . $createhash . " ";
 	    foreach ($people as $p)
 	    {
 		$cmd = $cmd . " " . $p;
        	    }
-
+	    echo $cmd;
 	    echo '<p><textarea id="startvm_log" name="startvm_log" rows="40" cols="100"></textarea><p>';
 	    echo '<p><input type="submit" value="Close" id="closeButton" style="display: none;" onclick="window.close();">';
 	    $_SESSION["filename"] = $_GET['createhash'];
@@ -215,11 +220,14 @@ class StartVm_Page {
         $createhash=$_GET['createhash'];	
 	$vmtype=$_GET['type'];
 	$node=$_GET['node'];
+
+	//	echo '<script type="text/javascript" src="scripts/utils.js"></script>';
 	
         if (!($db = $user->conf->contactdb())) {
             $db = $user->conf->dblink;
         }
         $result = Dbl::qe($db, "SELECT * FROM VMaccess vma left join VMs vm on vma.vmid=vm.vmid WHERE contactId = ? and vm.vmId = ?;", $user->contactId, $vmid);
+	
         if (!$result->fetch_assoc()) {
             $qreq->print_header("Access Denied", "createvm");
 
@@ -227,10 +235,10 @@ class StartVm_Page {
 
             $qreq->print_footer();
         } else {
-            include_once('src/pve_api/pve_functions.php');
+            //include_once('src/pve_api/pve_functions.php');
 
 	    $cmd = "perl consolevm " . $this->pid . " " . $vmtype . " " . $user->contactId . " " . $node;
-	    
+	    echo "$cmd<br>";
 	    $_SESSION["filename"] = $_GET['createhash'];
 
 	    $vncpass = "";			  
@@ -245,24 +253,27 @@ class StartVm_Page {
 	    $cmd = $cmd . " 2>&1 >> " . $file;
 	    $output = shell_exec($cmd);
 
-	    $query = "select portID from Ports WHERE vmid = \"" . $vmid . "\" and contactId = " . $user->contactId . " and node = \"" . $node . "\"";
+	    $query = "select portID, VNCpass from Ports p left join VMs v on p.vmid = v.vmid WHERE p.vmid = \"" . $vmid . "\" and contactId = " . $user->contactId . " and node = \"" . $node . "\"";
+	    
 	    print "Query $query\n";
 	    $result = Dbl::qe($db, $query);
 
 	    while($row = $result->fetch_row())
 	    {
 		$offset = $row[0];
-	    	echo "Offset $offset\n";
+		$vncpass = $row[1];
 	    }
 	    $vncport = 6080 + $offset;
 	    $consoleurl = "http://" . $_SERVER['HTTP_HOST'] . ":" . $vncport . "/vnc.html";
-	    echo "<script> child=window.open('" . $consoleurl . "','_self'); child.onunload = function(){ console.log('Child window closed'); };</script>";
-       	    exit;	 
+	    echo "<div><iframe src=\"" . $consoleurl . "\" width=\"100%\" height=\"100%\" onbeforeunload=alert('closing frame');></iframe>";
+	    echo "<script> window.onunload = alert('closing window'); closeport(" . $offset . ",'" . $vncpass . "'); </script>";	    	    	   
+	    exit;	 
     }
    
    }
     
-    static function go(Contact $user, Qrequest $qreq) {
+   static function go(Contact $user, Qrequest $qreq) {
+
         if (!$user->email) {
             $user->escape();
 
@@ -274,6 +285,7 @@ class StartVm_Page {
         if ($qreq->post && $qreq->post_empty()) {
             $user->conf->post_missing_msg();
         }
+	
         $op = new StartVm_Page($user, $qreq);
 
         if ($qreq->post && $qreq->valid_post()) {

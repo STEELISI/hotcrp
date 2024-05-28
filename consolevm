@@ -173,7 +173,7 @@ my $vncport = $termID + 5900;
 my $port = 10000 + $offset;
 my $proxyport = 6080 + $offset;
 print "Port $port proxyport $proxyport term ID $termID offset $offset\n";
-my $path=$opt{'webpath'};
+my $path=$opt{'webpath'} . "/secret";
 $ENV{HOME}=$path;
 my $config = "$path/config";
 my $admin=$opt{'clusterUser'};
@@ -213,7 +213,7 @@ if ($output <= 1)
     $cmd = "sudo -u merge ssh -F $mconfig xdc-$proj \"$xdccmd\"";
     $result=system($cmd);
     print "Creating new SSH tunnel";
-    $cmd = "sudo -u merge ssh -F $mconfig -L " . $port . ":localhost:" . $port . " xdc-$proj -t ssh -L " . $port . ":localhost:" . $vncport . " -N node 2>&1 </dev/null &";
+    $cmd = "sudo -u merge ssh -F $mconfig -L " . $port . ":localhost:" . $port . " xdc-$proj -t ssh -L " . $port . ":localhost:" . $vncport . " -N " . $nodeID . " 2>&1 </dev/null &";
     $result=system($cmd);
     if ($result != 0)
     {
@@ -226,7 +226,7 @@ $output = `ps axuw | grep novnc_proxy | grep "localhost:$port " | wc | awk '{pri
 if ($output <= 1)
 {
     print "Starting novnc proxy";
-    $cmd = "/var/noVNC/utils/novnc_proxy --vnc localhost:" . $port . " --listen $proxyport 2>&1 &";
+    $cmd = "sudo -u merge /var/noVNC/utils/novnc_proxy --vnc localhost:" . $port . " --listen $proxyport 2>&1 &";
     my $result=system($cmd);
     if ($result != 0)
     {

@@ -2877,9 +2877,28 @@ class PaperTable {
     	// Start VM option
 	include_once('src/pve_api/pve_functions.php');
 
-	echo '    <form id=vmcreate-form action="' . $this->conf->hoturl("startvm.php") . '"  method="get" target="new">';
+	$topo = 'select';
+	echo "POST " . print_r($_POST);
+
+	$hash = random_str(15);
+	if(!empty($_FILES['topofile']))
+  	{
+		$path = "uploads/";
+    		$path = $path . $hash . ".model";
+
+    		if(move_uploaded_file($_FILES['topofile']['tmp_name'], $path)) {
+      		   echo "The file ".  basename( $_FILES['topofile']['name']).  " has been uploaded";
+		   $topo = 'file';
+    	   } else{
+           echo "There was an error uploading the file, please try again!";
+    	  }
+	}
+	
+	
+	echo '    <form enctype="multipart/form-data" id=vmcreate-form action="' . $this->conf->hoturl("startvm.php") . '"  method="get" target="new">';
+	echo '        <input type="hidden" name="topo" value="' . $topo . '">';
         echo '        <input type="hidden" name="action" value="create">';
-        echo '        <input type="hidden" name="createhash" value="'.random_str(15).'">';
+        echo '        <input type="hidden" name="createhash" value="'.$hash.'">';
 	echo '	      <input type="hidden" name="pid" value="' . $this->prow->paperId . '">';
         echo '        <label for="vm-types">Choose a new VM to start:</label> ';
         echo '            <select name="vm-types" id="vm-types"> ';
@@ -2894,7 +2913,14 @@ class PaperTable {
 	fclose($myfile);
         echo '            </select>';
         echo '            <button><span style="color:green" align="center">&#x25B6;</span>Start VM</button>';
-        echo '            </form>';
+	echo '            </form>';
+
+	echo '<P>For complex experiments you can upload a topology: ';
+	echo '<form enctype="multipart/form-data" action="" method="POST">';
+	echo '<input type="file" name="topofile" id="topofile">';
+	echo ' <input type="submit" value="Upload"></input></form>';
+        
+
     }
 
 

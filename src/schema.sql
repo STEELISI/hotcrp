@@ -634,6 +634,18 @@ CREATE TABLE `Ports` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
+
+--
+-- Table structure for table `VMnodes`
+--
+
+DROP TABLE IF EXISTS `VMnodes`;
+CREATE TABLE `VMnodes` (
+  `vmid` varchar(256) NOT NULL,
+  `node`  varchar(256) NOT NULL,
+  PRIMARY KEY (`vmid`, `node`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 --
 -- Table structure for table `VMaccess`
 --

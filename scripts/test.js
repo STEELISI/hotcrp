@@ -6,6 +6,11 @@ function fun(file) {
 }
 
 
+function closeport(port)
+{
+    console.log("Should close " + port);
+}
+
 function greet()
 {
     const xhttp = new XMLHttpRequest();

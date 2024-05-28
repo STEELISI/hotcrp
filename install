@@ -21,6 +21,8 @@ sudo chown -R "merge:www-data" "/home/merge"
 sudo chmod 770 "/home/merge"
 echo "www-data    ALL=(merge) NOPASSWD: /usr/bin/ssh" | sudo EDITOR='tee -a' visudo
 sudo -u www-data mkdir /var/www/html/data
+sudo -u www-data mkdir /var/www/html/secret
+sudo -u www-data mkdir /var/www/html/uploads
 sudo sed -i 's/www-data//g' /etc/at.deny
 sudo atd restart
 sudo bash lib/createdb.sh
