@@ -244,7 +244,7 @@ for (my $i = 3; $i <= $#ARGV; $i++)
 		    $result = system($cmd);
 		    if ($result != 0)
 		    {
-			print "Membership update for project $proj and user $username failed";
+			print "Membership update for project $proj and user $username failed\n";
 		    }
 		}
 		else
@@ -313,7 +313,7 @@ if ($result != 0)
 	my $retries = 30;
 	for (my $tries = 0; $tries < $retries; $tries++)
 	{
-	    print "Checking if the XDC is up\n";
+	    print "Checking if the XDC is up ... this may take a few minutes\n";
 	    $cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"ls ~\" 2>&1 < /dev/null ";
 	    $result=system($cmd);
 	    if ($result != 0)
@@ -352,27 +352,28 @@ if ($result == 0)
     {
 	# There is a custom topology, parse out the nodes and put them into nodes file
 	my $uploadspath=$opt{'webpath'} . "/uploads";
-	my $topofile =  $uploadspath . "/" . $vncpass . ".model";
+	my $topofile =  $uploadspath . "/" . $vmtype . ".$proj.model";
 	parsenodes($topofile);
-	open(my $oh, ">", $uploadspath . "/" . $vncpass . ".nodes");
+	open(my $oh, ">", $uploadspath . "/" . $vmtype . ".$proj.nodes");
 	for my $n (@nodes)
 	{
 	    print $oh "$n\n";
 	}
 	close($oh);
-	$cmd = "mrg xdc scp upload " . $uploadspath . "/" . $vncpass . ".model xdc.$proj:.";
+	$cmd = "mrg xdc scp upload " . $uploadspath . "/" . $vmtype . ".$proj.model xdc.$proj:.";
+	print $cmd;
 	$result=system($cmd);
 	if ($result != 0)
 	{
-	    print "Could not upload the custom topology $vncpass.model to the testbed\n";
+	    print "Could not upload the custom topology $vmtype.$proj.model to the testbed\n";
 	    print "DONE";
 	    exit 1;
 	}
 	# Assume second upload will work
-	$cmd = "mrg xdc scp upload " . $uploadspath . "/" . $vncpass . ".nodes xdc.$proj:.";
+	$cmd = "mrg xdc scp upload " . $uploadspath . "/" . $vmtype . ".$proj.nodes xdc.$proj:.";
 	$result=system($cmd);
-	$custom="-n /home/$admin/$vncpass.nodes";
-	$modelpath = "/home/$admin/$vncpass.model";
+	$custom="-n /home/$admin/$vmtype.$proj.nodes";
+	$modelpath = "/home/$admin/$vmtype.$proj.model";
     }
     else
     {
@@ -394,7 +395,8 @@ if ($result == 0)
 	$sth->execute("$vmtype.$proj") or die "execution failed: $dbh->errstr()";
 	# If VM doesn't exist, insert info
 	if ($sth->rows == 0)
-	{	    
+	{
+	    $vncpass = substr(randompass(), 0, 8);
 	    $sth = $dbh->prepare(
 	    'INSERT INTO VMs(vmid, vmtype, VNCpass, vmdesc, paperId) values (?, ?, ?, ?, ?)')
 		or die "prepare statement failed: $dbh->errstr()";

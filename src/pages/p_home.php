@@ -565,8 +565,7 @@ class Home_Page {
 		    $vmdesc = $vm['vmdesc'];
 		    $vms[$index] = array();
 		    $vms[$index]['vmid'] = $vm['vmid'];
-		    if ($vm['vmtype'] != "file")
-		          $vms[$index]['type'] = $vm['vmtype'];
+		    $vms[$index]['type'] = $vm['vmtype'];
 		    $vms[$index]['node'] = $vm['node'];
 		    $node = $vm['node'];
 		    $offset = $vm['portId'];
@@ -581,7 +580,9 @@ class Home_Page {
 		    $consoleurl = "startvm.php?type=" . $vm['vmtype'] . "&action=console&pid=" . $vm['paperId'] . "&vmid=" . $vmid . "&createhash=" . $createhash . "&node=" . $node;
 		    $vms[$index]['console'] = "<a href=\"$consoleurl\" target=new>console</a>"; 
 		    //child.onunload = closeport(" . $offset . ",'" . $vncpass . "');\">console</a>";
+		    $createhash = random_str(15);
 		    $vms[$index]['reset'] = "<a href=\"startvm.php?type=" . $vm['vmtype'] . "&action=reset&pid=" . $vm['paperId'] . "&vmid=" . $vmid . "&createhash=" . $createhash . "\" target=new>reset</a>";
+		    $createhash = random_str(15);
 		    $vms[$index]['stop'] = "<a href=\"startvm.php?type=" . $vm['vmtype'] . "&action=stop&pid=" . $vm['paperId'] . "&vmid=" . $vmid . "&createhash=" . $createhash . "\" target=new>stop</a>";		    
 		    }		 	   
         };
@@ -592,7 +593,7 @@ class Home_Page {
         echo '<div id="foldre" class="homesubgrp">
                     <table class="pltable pltable-reviewerhome has-hotlist fold2c fold4c fold7c fold8c">';
 
-        echo '  
+        	    echo '  
                     <tr class="pl_headrow">
                     <th class="pr plh pl_id" data-pc="id">ID
                     </th>
@@ -623,7 +624,6 @@ class Home_Page {
         foreach ($vms as $vmid => $vminfo ){
 	
             echo '<tr class="pl '.$tag.' k0 plnx" data-pid="'.$vmid.'">'."\n";
-            echo '<td class="pr pr_id">';
             if ($tag == '') {
                 $tag = 'tag-gray';
             } else {

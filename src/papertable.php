@@ -2878,21 +2878,8 @@ class PaperTable {
 	include_once('src/pve_api/pve_functions.php');
 
 	$topo = 'select';
-	echo "POST " . print_r($_POST);
 
 	$hash = random_str(15);
-	if(!empty($_FILES['topofile']))
-  	{
-		$path = "uploads/";
-    		$path = $path . $hash . ".model";
-
-    		if(move_uploaded_file($_FILES['topofile']['tmp_name'], $path)) {
-      		   echo "The file ".  basename( $_FILES['topofile']['name']).  " has been uploaded";
-		   $topo = 'file';
-    	   } else{
-           echo "There was an error uploading the file, please try again!";
-    	  }
-	}
 	
 	
 	echo '    <form enctype="multipart/form-data" id=vmcreate-form action="' . $this->conf->hoturl("startvm.php") . '"  method="get" target="new">';
@@ -2915,9 +2902,22 @@ class PaperTable {
         echo '            <button><span style="color:green" align="center">&#x25B6;</span>Start VM</button>';
 	echo '            </form>';
 
-	echo '<P>For complex experiments you can upload a topology: ';
+	echo '<P>For complex experiments you can upload a topology specified using <a href="https://mergetb.org/docs/experimentation/model-ref/">topology description language</a>: ';
 	echo '<form enctype="multipart/form-data" action="" method="POST">';
 	echo '<input type="file" name="topofile" id="topofile">';
+	if(!empty($_FILES['topofile']))
+  	{
+		$path = "uploads/";
+    		$path = $path . "file." . $this->conf->opt("orgName") . "p" . $this->prow->paperId . ".model";
+
+    		if(move_uploaded_file($_FILES['topofile']['tmp_name'], $path)) {
+      		   echo "The file ".  basename( $_FILES['topofile']['name']).  " has been uploaded";
+		   $topo = 'file';
+    	   } else{
+           echo "There was an error uploading the file, please try again!";
+    	  }
+	}
+
 	echo ' <input type="submit" value="Upload"></input></form>';
         
 

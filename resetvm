@@ -7,6 +7,47 @@ use DBI;
 $|=1;
 
 
+our @nodes = ();
+our $node = "node";
+
+sub parsenodes
+{
+    my $topofile=shift;
+    my $fh = new IO::File($topofile);
+    while(<$fh>)
+    {
+        if ($_ !~ /net\.node/)
+        {
+            next;
+        }
+	my $state = 0;
+        my @items = split /[\,\[\]\'\s]+/, $_;
+        for my $i (@items)
+        {
+           if ($i eq "for" && $state == 0)
+           {
+                $state = 1;
+           }
+           elsif ($i eq "name" && $state == 1)
+           {
+                $state = 2;
+           }
+           elsif ($i eq "in" && $state == 2)
+           {
+                $state = 3;
+           }
+           elsif($state == 3)
+           {
+               push(@nodes, $i);
+	       if ($node eq "node")
+               {
+                   $node = $i;
+               }
+           }
+        }
+    }
+}
+
 sub randompass()
 {
 	my @alphanumeric = ('a'..'z', 'A'..'Z', 0..9,'!','_','-');
@@ -101,20 +142,27 @@ my %tocreate=();
 my $paperID = $ARGV[0];
 my $vmtype = $ARGV[1];
 my $vncpass = $ARGV[2];
+my $path=$opt{'webpath'} . "/secret";
+$ENV{HOME}=$path;
+print "HOME is " . $ENV{HOME} . "\n";
+
 # Set server
 my $cmd="mrg config set server grpc.mod.deterlab.net";
 system($cmd);
 # Create a project for paper if it does not exist
-my $logincmd =  "mrg login " . $opt{'clusterUser'} . " -p \"" . $opt{'clusterPass'};
+my $logincmd =  "mrg login " . $opt{'clusterUser'} . " -p \"" . $opt{'clusterPass'} . "\" 2>&1";
 # Log in as conf admin and as www-data user
 $cmd = $logincmd;
 my $result=system($cmd);
+print "Login result $result for cmd $logincmd\n";
 # Log in as conf admin and as merge user
 $cmd = "sudo -H -u merge " . $logincmd;
 my $result=system($cmd);
 # Check if project exists, and create if it does not
 my $proj = $opt{'clusterOrg'} . "p" . $paperID;
+my $vmid = "$vmtype.$proj";
 $cmd = "mrg show project $proj";
+print "cmd $cmd \n";
 my $result = system($cmd);
 if ($result != 0)
 {
@@ -122,8 +170,6 @@ if ($result != 0)
     print "DONE";
     exit 1;
 }
-my $path=$opt{'webpath'} . "/secret";
-$ENV{HOME}=$path;
 my $config = "$path/config";
 my $admin=$opt{'clusterUser'};
 open(my $oh, '>', $config) or die $!;
@@ -218,7 +264,7 @@ for (my $i = 3; $i <= $#ARGV; $i++)
 		    $result = system($cmd);
 		    if ($result != 0)
 		    {
-			print "Membership update for project $proj and user $username failed";
+			print "Membership update for project $proj and user $username failed\n";
 		    }
 		}
 		else
@@ -276,7 +322,7 @@ while ($outtries < $RETRIES && $success == 0)
 	# Try to contact XDC
 	for (my $tries = 0; $tries < $retries; $tries++)
 	{
-	    print "Checking if the XDC is up\n";
+	    print "Checking if the XDC is up ... this may take a few minutes\n";
 	    $cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"ls ~\" 2>&1 < /dev/null ";
 	    $result=system($cmd);
 	    if ($result != 0)
@@ -326,13 +372,29 @@ while ($outtries < $RETRIES && $success == 0)
 }
 my $running = 0;
 my $reachable = 0;
+my $custom = "";
+my $uploadspath = "";
+my $topofile = "";
 if ($success == 1)
 {
+    if ($vmtype eq "file")
+    {
+	# There is a custom topology, parse out the nodes and put them into nodes file
+	$uploadspath=$opt{'webpath'} . "/uploads";
+	$topofile =  $uploadspath . "/" . $vmtype . ".$proj.model";
+	parsenodes($topofile);
+	open(my $oh, ">", $uploadspath . "/" . $vmtype . ".$proj.nodes");
+	for my $n (@nodes)
+	{
+	    print $oh "$n\n";
+	}
+	close($oh);
+    }
     $outtries = 0;
     while ($outtries < $RETRIES)
     {
 	print "XDC exists and is running, we will now try to contact the VM\n";
-	my $xdccmd="ping -c 1 node";
+	my $xdccmd="ping -c 1 $node";
 	$cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"$xdccmd\"";
 	open(my $cmdh, " $cmd | ");
 	my $output = "";
@@ -359,50 +421,122 @@ if ($success == 1)
 	    }
 	    else
 	    {
-		# Create the VM in that project
-		my $xdccmd="/share/staging/startexp -p $proj -n $vmtype -m /share/EAC/$vmtype/$vmtype.model $vmtype";
-		print "XDC command $xdccmd\n";
+		# Check if we have a custom topology
+		my $modelpath = "";
+		if ($vmtype eq "file")
+		{
+		    	$cmd = "mrg xdc scp upload " . $uploadspath . "/" . $vmtype . ".$proj.model xdc.$proj:.";
+			print $cmd;
+			$result=system($cmd);
+			if ($result != 0)
+			{
+			    print "Could not upload the custom topology $vmtype.$proj.model to the testbed\n";
+			    print "DONE";
+			    exit 1;
+			}
+			# Assume second upload will work
+			$cmd = "mrg xdc scp upload " . $uploadspath . "/" . $vmtype . ".$proj.nodes xdc.$proj:.";
+			$result=system($cmd);
+			$custom="-n /home/$admin/$vmtype.$proj.nodes";
+			$modelpath = "/home/$admin/$vmtype.$proj.model";
+		}
+		else
+		{
+		    $modelpath = "/share/EAC/$vmtype/$vmtype.model";
+		}
+		# Try to start the experiment                                                                                                                                                                                         
+		my $xdccmd="/share/staging/startexp -p $proj -n $vmtype -m $modelpath $vmtype";
+		print "$xdccmd\n";
 		$cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"$xdccmd\"";
 		$result=system($cmd);
 		if ($result == 0)
 		{
 		    print "Experiment is now running\n";
 		    $running = 1;
-
+		    # Insert info into DB            
 		    my $sth = $dbh->prepare(
 			'SELECT * FROM VMs WHERE vmid = ?')
 			or die "prepare statement failed: $dbh->errstr()";
-		    $sth->execute("$vmtype.$proj") or die "execution failed: $dbh->errstr()";
-		    # If VM doesn't exist, insert info
+		    $sth->execute("$vmid") or die "execution failed: $dbh->errstr()";
+		    # If VM doesn't exist, insert info	 
 		    if ($sth->rows == 0)
 		    {
-			# Insert info into DB if needed
-		    	$sth = $dbh->prepare(
+			$vncpass = substr(randompass(), 0, 8);
+			$sth = $dbh->prepare(
 			    'INSERT INTO VMs(vmid, vmtype, VNCpass, vmdesc, paperId) values (?, ?, ?, ?, ?)')
 			    or die "prepare statement failed: $dbh->errstr()";
-			$sth->bind_param(1, "$vmtype.$proj");
+			my $vmdesc = "";
+			if ($vmtype eq "file")
+			{
+			    $vmdesc="Custom topology";
+			}
+			else
+			{
+			    $vmdesc = $vms{$vmtype};
+			    push(@nodes, $node);
+			}
+			
+			$sth->bind_param(1, $vmid);
 			$sth->bind_param(2, $vmtype);
 			$sth->bind_param(3, $vncpass);	
-			$sth->bind_param(4, $vms{$vmtype});
+			$sth->bind_param(4, $vmdesc);
 			$sth->bind_param(5, $paperID);
-			
 			$sth->execute or die "execution failed: $dbh->errstr()";
 			$sth->finish;
+			# Remember all the nodes that a user could access
+			for my $n (@nodes)
+			{
+			    $sth = $dbh->prepare(
+				'INSERT INTO VMnodes(vmid, node) values (?, ?)')
+				or die "prepare statement failed: $dbh->errstr()";
+			    $sth->bind_param(1, $vmid);
+			    $sth->bind_param(2, $n);
+			    $sth->execute or die "execution failed: $dbh->errstr()";		
+			    $sth->finish;
+			}
 		    }
-		    else
+		    for (my $i = 3; $i <= $#ARGV; $i++)
 		    {
-			$sth = $dbh->prepare(
-                        'SELECT VNCpass FROM VMs WHERE vmid = ?')
-			or die "prepare statement failed: $dbh->errstr()";
-			$sth->execute("$vmtype.$proj") or die "execution failed: $dbh->errstr()";
-			while (my $ref = $sth->fetchrow_hashref()) {
-			    $vncpass = $ref->{'VNCpass'};
+			my $id = $ARGV[$i];
+			
+			# Check if we need to insert into access                                                                                           
+			my $sth = $dbh->prepare(
+			    'SELECT * FROM VMaccess WHERE vmid = ? AND contactID = ?')
+			    or die "prepare statement failed: $dbh->errstr()";
+			$sth->bind_param(1, "$vmid");
+			$sth->bind_param(2, $id);
+			$sth->execute or die "execution failed: $dbh->errstr()";
+			$sth->finish;
+			
+			if ($sth->rows == 0)
+			{
+			    
+			    $sth = $dbh->prepare(
+				'INSERT INTO VMaccess (vmid, contactId) values (?, ?)')
+				or die "prepare statement failed: $dbh->errstr()";
+			    $sth->bind_param(1, "$vmid");
+			    $sth->bind_param(2, $id);
+			    $sth->execute or die "execution failed: $dbh->errstr()";
+			    $sth->finish;
+			    # Also reserve ports
+			    for my $n (@nodes)
+			    {
+				$sth = $dbh->prepare(
+				    'INSERT INTO Ports (vmid, contactId, node) values (?, ?, ?)')
+				    or die "prepare statement failed: $dbh->errstr()";
+				$sth->bind_param(1, "$vmid");
+				$sth->bind_param(2, $id);
+				$sth->bind_param(3, $n);
+				$sth->execute or die "execution failed: $dbh->errstr()";
+				$sth->finish;
+			    }
 			}
 		    }
 		}
 		else
 		{
-		    print "Start experiment failed, will try again\n";		    
+		    print "Start experiment failed, will try again\n";
+		    
 		}
 	    }	    
 	}
@@ -429,7 +563,7 @@ if ($success == 1)
 	$sth = $dbh->prepare(
 	    'SELECT VNCpass FROM VMs WHERE vmid = ?')
 	    or die "prepare statement failed: $dbh->errstr()";
-	$sth->execute("$vmtype.$proj") or die "execution failed: $dbh->errstr()";
+	$sth->execute("$vmid") or die "execution failed: $dbh->errstr()";
 	if ($sth->rows > 0)
 	{			    
 	    while (my $ref = $sth->fetchrow_hashref()) {
@@ -437,7 +571,15 @@ if ($success == 1)
 	    }
 	}
 	print "Setting up experiment\n";
-	$cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"/share/staging/runlab -f /share/EAC -v $vncpass $vmtype\" 2>&1 < /dev/null ";
+	if ($vmtype eq "file")
+	{
+	    $cmd = "mrg xdc scp upload " . $uploadspath . "/" . $vmtype . ".$proj.nodes xdc.$proj:.";
+	    $result=system($cmd);
+	    $custom="-n /home/$admin/$vmtype.$proj.nodes";
+	}
+	print "Custom is $custom\n";
+	$cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"/share/staging/runlab -f /share/EAC $custom -v $vncpass $vmtype\" 2>&1 < /dev/null ";
+	print "$cmd";
 	$result=system($cmd);
 	if ($result != 0)
 	{

@@ -121,4 +121,12 @@ $sth = $dbh->prepare(
 	'DELETE FROM VMaccess where vmid = ?')
 	or die "prepare statement failed: $dbh->errstr()";
 $sth->execute($vmid) or die "execution failed: $dbh->errstr()";
+$sth = $dbh->prepare(
+	'DELETE FROM VMnodes where vmid = ?')
+	or die "prepare statement failed: $dbh->errstr()";
+$sth->execute($vmid) or die "execution failed: $dbh->errstr()";
+$sth = $dbh->prepare(
+	'DELETE FROM Ports where vmid = ?')
+	or die "prepare statement failed: $dbh->errstr()";
+$sth->execute($vmid) or die "execution failed: $dbh->errstr()";
 print "DONE";

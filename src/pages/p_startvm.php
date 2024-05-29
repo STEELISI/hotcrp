@@ -202,6 +202,8 @@ class StartVm_Page {
 	    {
 		$cmd = $cmd . " " . $p;
        	    }
+	    echo $cmd;
+
 	    echo '<p><textarea id="startvm_log" name="startvm_log" rows="40" cols="100"></textarea><p>';
 	    echo '<p><input type="submit" value="Close" id="closeButton" style="display: none;" onclick="window.close();">';
 	    $_SESSION["filename"] = $_GET['createhash'];
@@ -241,13 +243,6 @@ class StartVm_Page {
 	    echo "$cmd<br>";
 	    $_SESSION["filename"] = $_GET['createhash'];
 
-	    $vncpass = "";			  
-            foreach ($result as $vm){
-                    $vncpass = $vm['VNCpass'];
-	     }
-
-           
-	    // count the lines exist in the file
 	    $file = 'data/'. $_SESSION["filename"];
 	    $result=exec("touch " . $file);
 	    $cmd = $cmd . " 2>&1 >> " . $file;
@@ -264,9 +259,10 @@ class StartVm_Page {
 		$vncpass = $row[1];
 	    }
 	    $vncport = 6080 + $offset;
-	    $consoleurl = "http://" . $_SERVER['HTTP_HOST'] . ":" . $vncport . "/vnc.html";
-	    echo "<div><iframe src=\"" . $consoleurl . "\" width=\"100%\" height=\"100%\" onbeforeunload=alert('closing frame');></iframe>";
-	    echo "<script> window.onunload = alert('closing window'); closeport(" . $offset . ",'" . $vncpass . "'); </script>";	    	    	   
+	    $consoleurl = "openconsole.php?port=$vncport&offset=$offset&pass=$vncpass";
+	    //$consoleurl = "http://" . $_SERVER['HTTP_HOST'] . ":" . $vncport . "/vnc.html";
+	    echo "<script> window.open('" . $consoleurl . "', '_self') </script>;
+	    // closeport(" . $offset . ",'" . $vncpass . "'); </script>";	    	    	   
 	    exit;	 
     }
    
