@@ -154,7 +154,6 @@ my $logincmd =  "mrg login " . $opt{'clusterUser'} . " -p \"" . $opt{'clusterPas
 # Log in as conf admin and as www-data user
 $cmd = $logincmd;
 my $result=system($cmd);
-print "Login result $result for cmd $logincmd\n";
 # Log in as conf admin and as merge user
 $cmd = "sudo -H -u merge " . $logincmd;
 my $result=system($cmd);
@@ -162,7 +161,6 @@ my $result=system($cmd);
 my $proj = $opt{'clusterOrg'} . "p" . $paperID;
 my $vmid = "$vmtype.$proj";
 $cmd = "mrg show project $proj";
-print "cmd $cmd \n";
 my $result = system($cmd);
 if ($result != 0)
 {
@@ -286,7 +284,7 @@ for (my $i = 3; $i <= $#ARGV; $i++)
 	$result = system($cmd);
 	if ($result != 0)
 	{
-	    print "Membership update for project $proj and user $username failed";
+	    print "Membership update for project $proj and user $username failed\n";
 	}
     }
     $sth->finish;
@@ -308,9 +306,8 @@ my $outtries = 0;
 my $success = 0;
 while ($outtries < $RETRIES && $success == 0)
 {
-    $cmd="mrg list xdcs | grep xdc.$proj";
+    $cmd="mrg list xdcs | grep xdc.$proj > /dev/null";
     $result=system($cmd);
-
     if ($result == 0)
     {
 	my $retries = 30;
@@ -323,11 +320,10 @@ while ($outtries < $RETRIES && $success == 0)
 	for (my $tries = 0; $tries < $retries; $tries++)
 	{
 	    print "Checking if the XDC is up ... this may take a few minutes\n";
-	    $cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"ls ~\" 2>&1 < /dev/null ";
+	    $cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"ls ~\" 2>&1 > /dev/null < /dev/null ";
 	    $result=system($cmd);
 	    if ($result != 0)
 	    {
-		print "Result $result\n";
 		sleep(1);		
 	    }
 	    else
@@ -446,7 +442,6 @@ if ($success == 1)
 		}
 		# Try to start the experiment                                                                                                                                                                                         
 		my $xdccmd="/share/staging/startexp -p $proj -n $vmtype -m $modelpath $vmtype";
-		print "$xdccmd\n";
 		$cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"$xdccmd\"";
 		$result=system($cmd);
 		if ($result == 0)
@@ -577,9 +572,7 @@ if ($success == 1)
 	    $result=system($cmd);
 	    $custom="-n /home/$admin/$vmtype.$proj.nodes";
 	}
-	print "Custom is $custom\n";
 	$cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"/share/staging/runlab -f /share/EAC $custom -v $vncpass $vmtype\" 2>&1 < /dev/null ";
-	print "$cmd";
 	$result=system($cmd);
 	if ($result != 0)
 	{

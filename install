@@ -1,12 +1,12 @@
 PASS="putsomethinghere"
+
+# Install Apache and other necessary packages
 sudo apt update
 sudo apt install -y emacs apache2 php mariadb-server mariadb-client-core-10.6 php-fpm php-intl exim4-daemon-heavy php-mysql php-mbstring php-curl rpm at expect
 sudo a2enmod php8.1 
 sudo service apache2 restart
-#sudo mysql << eof
-#CREATE USER 'test'@localhost IDENTIFIED BY 'testpass';
-#GRANT ALL PRIVILEGES ON *.* TO 'test'@localhost IDENTIFIED BY 'testpass';
-#eof
+
+# Install merge CLI and noVNC
 curl -L --output /tmp/mrg.rpm https://gitlab.com/mergetb/portal/cli/-/releases/v1.2.1/downloads/mrg_1.2.1_linux_amd64.rpm
 sudo rpm -i /tmp/mrg.rpm
 git clone https://github.com/novnc/noVNC
@@ -14,15 +14,20 @@ sudo mv noVNC /var/
 openssl req -new -x509 -days 365 -nodes -out self.pem -keyout self.pem
 sudo cp self.pem /var/noVNC/utils
 sudo chown -R www-data:www-data /var/noVNC
+
+# Create user "merge" that can login
 sudo useradd -s /bin/bash "merge"
 echo "merge:$PASS" | sudo chpasswd
-sudo usermod -aG www-data merge
-sudo chown -R "merge:www-data" "/home/merge"
-sudo chmod 770 "/home/merge"
-echo "www-data    ALL=(merge) NOPASSWD: /usr/bin/ssh" | sudo EDITOR='tee -a' visudo
+
+# Let www-data execute commands as user merge, this is needed for SSH tunnels
+echo "www-data    ALL=(merge) NOPASSWD: ALL" | sudo EDITOR='tee -a' visudo
+
+# Create directories for secrets, uploads and logs
 sudo -u www-data mkdir /var/www/html/data
 sudo -u www-data mkdir /var/www/html/secret
 sudo -u www-data mkdir /var/www/html/uploads
 sudo sed -i 's/www-data//g' /etc/at.deny
 sudo atd restart
+
+# Initialize HotCRP
 sudo bash lib/createdb.sh

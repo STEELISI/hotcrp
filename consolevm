@@ -168,7 +168,6 @@ else
     my $ref = $sth->fetchrow_hashref();
     $offset = $ref->{'portId'};
 }    
-print "Offset $offset\n";
 my $vncport = $termID + 5900;
 my $port = 10000 + $offset;
 my $proxyport = 6080 + $offset;
@@ -212,7 +211,7 @@ if ($output <= 1)
     my $xdccmd = "rm /home/" . $opt{'clusterUser'} . "/.ssh/known_hosts 2>&1";
     $cmd = "sudo -u merge ssh -F $mconfig xdc-$proj \"$xdccmd\"";
     $result=system($cmd);
-    print "Creating new SSH tunnel";
+    print "Creating new SSH tunnel\n";
     $cmd = "sudo -u merge ssh -F $mconfig -L " . $port . ":localhost:" . $port . " xdc-$proj -t ssh -L " . $port . ":localhost:" . $vncport . " -N " . $nodeID . " 2>&1 </dev/null &";
     $result=system($cmd);
     if ($result != 0)
@@ -225,7 +224,7 @@ if ($output <= 1)
 $output = `ps axuw | grep novnc_proxy | grep "localhost:$port " | wc | awk '{print \$1}'`;
 if ($output <= 1)
 {
-    print "Starting novnc proxy";
+    print "Starting novnc proxy\n";
     $cmd = "sudo -u merge /var/noVNC/utils/novnc_proxy --vnc localhost:" . $port . " --listen $proxyport 2>&1 &";
     my $result=system($cmd);
     if ($result != 0)

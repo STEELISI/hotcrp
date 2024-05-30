@@ -2902,7 +2902,7 @@ class PaperTable {
         echo '            <button><span style="color:green" align="center">&#x25B6;</span>Start VM</button>';
 	echo '            </form>';
 
-	echo '<P>For complex experiments you can upload a topology specified using <a href="https://mergetb.org/docs/experimentation/model-ref/">topology description language</a>: ';
+	echo '<P>For complex experiments you can upload a topology specified using <a href="https://mergetb.org/docs/experimentation/model-ref/" target="new">topology description language</a>: ';
 	echo '<form enctype="multipart/form-data" action="" method="POST">';
 	echo '<input type="file" name="topofile" id="topofile">';
 	if(!empty($_FILES['topofile']))

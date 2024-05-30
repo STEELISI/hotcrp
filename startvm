@@ -266,7 +266,7 @@ for (my $i = 3; $i <= $#ARGV; $i++)
 	$result = system($cmd);
 	if ($result != 0)
 	{
-	    print "Membership update for project $proj and user $username failed";
+	    print "Membership update for project $proj and user $username failed\n";
 	}
     }
     $sth->finish;
@@ -314,11 +314,10 @@ if ($result != 0)
 	for (my $tries = 0; $tries < $retries; $tries++)
 	{
 	    print "Checking if the XDC is up ... this may take a few minutes\n";
-	    $cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"ls ~\" 2>&1 < /dev/null ";
+	    $cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"ls ~\" 2>&1 > /dev/null < /dev/null ";
 	    $result=system($cmd);
 	    if ($result != 0)
 	    {
-		print "Result $result\n";
 		sleep(1);		
 	    }
 	    else
