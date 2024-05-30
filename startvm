@@ -359,8 +359,16 @@ if ($result == 0)
 	    print $oh "$n\n";
 	}
 	close($oh);
+	# Do a sanity check, does it compile?
+	$cmd = "mrg compile " .  $uploadspath . "/" . $vmtype . ".$proj.model";
+	my $output = `$cmd`;
+	if ($output =~ /Error/)
+	{
+	    print "This model does not compile. Please check the topology file.\n";
+	    print "DONE";
+	    exit 1;
+	}
 	$cmd = "mrg xdc scp upload " . $uploadspath . "/" . $vmtype . ".$proj.model xdc.$proj:.";
-	print $cmd;
 	$result=system($cmd);
 	if ($result != 0)
 	{

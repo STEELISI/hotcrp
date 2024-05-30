@@ -96,6 +96,7 @@ class StartVm_Page {
 	    	  $id = $row[0];
 		  array_push($people, $id);
 	    }
+
 	    if ($topo == "file")
 	    {
 	        $vmtype = "file";
