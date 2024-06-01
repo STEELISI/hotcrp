@@ -170,7 +170,7 @@ class StartVm_Page {
         } else {
             include_once('src/pve_api/pve_functions.php');
 
-            $qreq->print_header("Resetting the VM", "resetvm");
+            $qreq->print_header("Repairing the VM", "resetvm");
 
 	    $people=[];
 	    $result = Dbl::qe($db, "select authorInformation from Paper WHERE paperID = ?;", $this->pid);

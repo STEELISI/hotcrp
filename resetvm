@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 use DBI;
+use Time::Local qw( timelocal_posix timegm_posix );
 
 $|=1;
 
@@ -450,7 +451,15 @@ if ($success == 1)
 		{
 		    print "Experiment is now running\n";
 		    $running = 1;
-		    # Insert info into DB            
+		    # Insert info into DB
+		    $cmd="mrg show realization real.$vmtype.$proj";
+		    my $output=`$cmd| grep Expires | sed 's/Expires:  //'`;
+		    $output =~ s/\n//;
+		    #2024-06-08 17:16:24 +0000 UTC
+		    my @items = split /[\s\-\:]/, $output;
+		    my $end_time=timegm_posix($items[5], $items[4], $items[3], $items[2], $items[1]-1, $items[0]-1900);
+		    my $create_time=time();
+		    
 		    my $sth = $dbh->prepare(
 			'SELECT * FROM VMs WHERE vmid = ?')
 			or die "prepare statement failed: $dbh->errstr()";
