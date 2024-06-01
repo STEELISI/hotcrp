@@ -84,17 +84,14 @@ my $vmtype = $ARGV[1];
 my $userID = $ARGV[2];
 my $nodeID = $ARGV[3];
 # Set server
+my $path=$opt{'webpath'} . "/secret";
+$ENV{HOME}=$path;
 my $cmd="mrg config set server grpc.mod.deterlab.net";
 system($cmd);
 my $proj = $opt{'clusterOrg'} . "p" . $paperID;
 my $vmid = $vmtype . "." . $proj;
 # Org owner will always have an account on VM even when they are not a reviewer or author
-$sth = $dbh->prepare(
-	'SELECT username from ClusterUsers where contactID=1')
-	or die "prepare statement failed: $dbh->errstr()";
-$sth->execute() or die "execution failed: $dbh->errstr()";
-my $ref = $sth->fetchrow_hashref();
-my $ownerusername = $ref->{'username'};
+my $ownerusername = $opt{'clusterUser'};
 my $hasaccess = 0;
 # Check if org owner is on the list for access to this VM
 $sth = $dbh->prepare(
@@ -133,6 +130,7 @@ my $termID = $i;
 # Now check if org owner's presence on that VM intereferes with termID calculation
 if (!$hasaccess && $ownerusername lt $username)
 {
+    print "Has acess $hasaccess owner $ownerusername mine $username\n";
     $termID++;
 }
 # Find port numbers that would go with this instance
@@ -172,8 +170,6 @@ my $vncport = $termID + 5900;
 my $port = 10000 + $offset;
 my $proxyport = 6080 + $offset;
 print "Port $port proxyport $proxyport term ID $termID offset $offset\n";
-my $path=$opt{'webpath'} . "/secret";
-$ENV{HOME}=$path;
 my $config = "$path/config";
 my $admin=$opt{'clusterUser'};
 my $logincmd =  "mrg login " . $opt{'clusterUser'} . " -p \"" . $opt{'clusterPass'} . "\"";

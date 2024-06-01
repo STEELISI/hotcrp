@@ -312,39 +312,38 @@ if ($result != 0)
     $cmd="mrg new xdc xdc.$proj";
     $result=system($cmd);
     
-    if ($result == 0)
-    {
-	sleep(30);
-	# Created XDC, now need to wait for it to be live
-	my $retries = 30;
-	for (my $tries = 0; $tries < $retries; $tries++)
-	{
-	    print "Checking if the XDC is up ... this may take a few minutes\n";
-	    $cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"ls ~\" 2>&1 > /dev/null < /dev/null ";
-	    $result=system($cmd);
-	    if ($result != 0)
-	    {
-		sleep(1);		
-	    }
-	    else
-	    {
-		print "XDC is now operational\n";
-		last;
-	    }
-	}
-	if ($result != 0)
-	{
-	    print "XDC did not come up within prescribed time\n";
-	    print "DONE";
-	    exit 1;
-	}
-    }
-    else
+    if ($result != 0)
     {
 	print "XDC creation has failed\n";
 	print "DONE";
 	exit 1;
     }
+}
+sleep(30);
+# Created XDC, now need to wait for it to be live
+my $retries = 30;
+for (my $tries = 0; $tries < $retries; $tries++)
+{
+    print "Checking if the XDC is up ... this may take a few minutes\n";
+    $cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"ls ~\" 2>&1 > /dev/null < /dev/null ";
+    $result=system($cmd);
+    if ($result != 0)
+    {
+	sleep(1);		
+    }
+    else
+    {
+	print "XDC is now operational\n";
+	last;
+    }
+}
+if ($result != 0)
+{
+    print "XDC did not come up within prescribed time, will delete it\n";
+    $cmd = "mrg delete xdc xdc.$proj";
+    system($cmd);
+    print "DONE";
+    exit 1;
 }
 my $custom="";
 if ($result == 0)
@@ -374,7 +373,8 @@ if ($result == 0)
 	    print "DONE";
 	    exit 1;
 	}
-	$cmd = "mrg xdc scp upload " . $uploadspath . "/" . $vmtype . ".$proj.model xdc.$proj:.";
+	$cmd = "mrg xdc scp upload " . $uploadspath . "/" . $vmtype . ".$proj.model xdc.$proj:. 2>&1";
+	print "$cmd\n";
 	$result=system($cmd);
 	if ($result != 0)
 	{
