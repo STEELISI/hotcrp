@@ -9,6 +9,8 @@ sudo service apache2 restart
 # Install merge CLI and noVNC
 curl -L --output /tmp/mrg.rpm https://gitlab.com/mergetb/portal/cli/-/releases/v1.2.1/downloads/mrg_1.2.1_linux_amd64.rpm
 sudo rpm -i /tmp/mrg.rpm
+sudo mrg update binary
+
 git clone https://github.com/novnc/noVNC
 sudo mv noVNC /var/
 openssl req -new -x509 -days 365 -nodes -out self.pem -keyout self.pem
