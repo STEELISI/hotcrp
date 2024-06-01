@@ -459,9 +459,9 @@ if ($success == 1)
 		    if ($sth->rows == 0)
 		    {
 			$vncpass = substr(randompass(), 0, 8);
-			$sth = $dbh->prepare(
-			    'INSERT INTO VMs(vmid, vmtype, VNCpass, vmdesc, paperId) values (?, ?, ?, ?, ?)')
-			    or die "prepare statement failed: $dbh->errstr()";
+				    $sth = $dbh->prepare(
+					'INSERT INTO VMs(vmid, vmtype, VNCpass, vmdesc, paperId, create_time, end_time) values (?, ?, ?, ?, ?, ?, ?)')
+					or die "prepare statement failed: $dbh->errstr()";
 			my $vmdesc = "";
 			if ($vmtype eq "file")
 			{
@@ -478,6 +478,9 @@ if ($success == 1)
 			$sth->bind_param(3, $vncpass);	
 			$sth->bind_param(4, $vmdesc);
 			$sth->bind_param(5, $paperID);
+			$sth->bind_param(6, $create_time);
+			$sth->bind_param(7, $end_time);
+			
 			$sth->execute or die "execution failed: $dbh->errstr()";
 			$sth->finish;
 			# Remember all the nodes that a user could access
