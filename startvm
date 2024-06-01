@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 use DBI;
+use Time::Local qw( timelocal_posix timegm_posix );
 
 $|=1;
 
@@ -308,7 +309,7 @@ $result=system($cmd);
 if ($result != 0)    
 {    
     # XDC needs to be created
-    print "Creating XDC xdc.$proj\n";
+    print "Creating XDC xdc.$proj this may take a bit\n";
     $cmd="mrg new xdc xdc.$proj";
     $result=system($cmd);
     
@@ -318,8 +319,11 @@ if ($result != 0)
 	print "DONE";
 	exit 1;
     }
+    else
+    {
+	sleep(30);
+    }       
 }
-sleep(30);
 # Created XDC, now need to wait for it to be live
 my $retries = 30;
 for (my $tries = 0; $tries < $retries; $tries++)
@@ -401,6 +405,13 @@ if ($result == 0)
     {
 	print "Experiment is now running\n";
 	# Insert info into DB
+	$cmd="mrg show realization real.$vmtype.$proj";
+	my $output=`$cmd| grep Expires | sed 's/Expires:  //'`;
+	$output =~ s/\n//;
+	#2024-06-08 17:16:24 +0000 UTC
+	my @items = split /[\s\-\:]/, $output;
+	my $end_time=timegm_posix($items[5], $items[4], $items[3], $items[2], $items[1]-1, $items[0]-1900);
+	my $create_time=time();
 	
 	my $sth = $dbh->prepare(
 	    'SELECT * FROM VMs WHERE vmid = ?')
@@ -411,7 +422,7 @@ if ($result == 0)
 	{
 	    $vncpass = substr(randompass(), 0, 8);
 	    $sth = $dbh->prepare(
-	    'INSERT INTO VMs(vmid, vmtype, VNCpass, vmdesc, paperId) values (?, ?, ?, ?, ?)')
+	    'INSERT INTO VMs(vmid, vmtype, VNCpass, vmdesc, paperId, create_time, end_time) values (?, ?, ?, ?, ?, ?, ?)')
 		or die "prepare statement failed: $dbh->errstr()";
 	    my $vmdesc = "";
 	    if ($vmtype eq "file")
@@ -429,6 +440,8 @@ if ($result == 0)
 	    $sth->bind_param(3, $vncpass);	
 	    $sth->bind_param(4, $vmdesc);
 	    $sth->bind_param(5, $paperID);
+	    $sth->bind_param(6, $create_time);
+	    $sth->bind_param(7, $end_time);
 	    $sth->execute or die "execution failed: $dbh->errstr()";
 	    $sth->finish;
 	    # Remember all the nodes that a user could access

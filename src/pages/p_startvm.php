@@ -216,6 +216,40 @@ class StartVm_Page {
     }
 }
 
+   function extend_vm(Contact $user, Qrequest $qreq, $vmid) {
+        $createhash=$_GET['createhash'];	
+	$vmtype=$_GET['type'];
+	
+        if (!($db = $user->conf->contactdb())) {
+            $db = $user->conf->dblink;
+        }
+        $result = Dbl::qe($db, "SELECT * FROM VMaccess WHERE contactId = ? and vmId = ?;", $user->contactId, $vmid);
+        if (!$result->fetch_assoc()) {
+            $qreq->print_header("Access Denied", "createvm");
+
+            echo '<p>You do not have access to this VM.</p>';
+
+            $qreq->print_footer();
+        } else {
+            include_once('src/pve_api/pve_functions.php');
+
+            $qreq->print_header("Extending the VM", "extendvm");
+
+	    $cmd = "perl extendvm " . $this->pid . " " . $vmtype . " " . $createhash . " ";
+
+	    echo '<p><textarea id="startvm_log" name="startvm_log" rows="40" cols="100"></textarea><p>';
+	    echo '<p><input type="submit" value="Close" id="closeButton" style="display: none;" onclick="window.close();">';
+	    $_SESSION["filename"] = $_GET['createhash'];
+
+	    $file = 'data/'. $_SESSION["filename"];
+	    $result=exec("touch " . $file);
+	    $cmd = $cmd . " 2>&1 >> " . $file;
+	    $cmd = "echo \"" . $cmd . "\" | at -m now";
+	    $this->get_log($file);
+	    $output = shell_exec($cmd);
+     }
+  }
+
     function console_vm(Contact $user, Qrequest $qreq, $vmid) {
         $createhash=$_GET['createhash'];	
 	$vmtype=$_GET['type'];
@@ -280,6 +314,8 @@ static function go(Contact $user, Qrequest $qreq) {
                 $op->create_vm($user, $qreq);
             } elseif ($_GET['action'] == 'reset' && array_key_exists('vmid', $_GET)) {
                 $op->reset_vm($user, $qreq, $_GET['vmid']);
+             } elseif ($_GET['action'] == 'extend' && array_key_exists('vmid', $_GET)) {
+                $op->extend_vm($user, $qreq, $_GET['vmid']);
 	    } elseif ($_GET['action'] == 'console' && array_key_exists('vmid', $_GET)) {
                 $op->console_vm($user, $qreq, $_GET['vmid']);
 	    } elseif ($_GET['action'] == 'stop' && array_key_exists('vmid', $_GET)) {

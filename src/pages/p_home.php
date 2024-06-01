@@ -576,12 +576,15 @@ class Home_Page {
 		    $vms[$index]['suid'] = $suid;
 		    $vms[$index]['spass'] = $spass;		    
 		    
-		    $vms[$index]['started'] = $vm['create_time'];
+		    $vms[$index]['started'] = date('r', $vm['create_time']);
+		    $vms[$index]['ends'] = date('r', $vm['end_time']);
 		    $consoleurl = "startvm.php?type=" . $vm['vmtype'] . "&action=console&pid=" . $vm['paperId'] . "&vmid=" . $vmid . "&createhash=" . $createhash . "&node=" . $node;
 		    $vms[$index]['console'] = "<a href=\"$consoleurl\" target=new>console</a>"; 
 		    //child.onunload = closeport(" . $offset . ",'" . $vncpass . "');\">console</a>";
 		    $createhash = random_str(15);
-		    $vms[$index]['reset'] = "<a href=\"startvm.php?type=" . $vm['vmtype'] . "&action=reset&pid=" . $vm['paperId'] . "&vmid=" . $vmid . "&createhash=" . $createhash . "\" target=new>reset</a>";
+		    $vms[$index]['reset'] = "<a href=\"startvm.php?type=" . $vm['vmtype'] . "&action=reset&pid=" . $vm['paperId'] . "&vmid=" . $vmid . "&createhash=" . $createhash . "\" target=new>repair</a>";
+		    $createhash = random_str(15);
+		    $vms[$index]['extend'] = "<a href=\"startvm.php?type=" . $vm['vmtype'] . "&action=extend&pid=" . $vm['paperId'] . "&vmid=" . $vmid . "&createhash=" . $createhash . "\" target=new>extend</a>";
 		    $createhash = random_str(15);
 		    $vms[$index]['stop'] = "<a href=\"startvm.php?type=" . $vm['vmtype'] . "&action=stop&pid=" . $vm['paperId'] . "&vmid=" . $vmid . "&createhash=" . $createhash . "\" target=new>stop</a>";		    
 		    }		 	   
@@ -609,11 +612,15 @@ class Home_Page {
                     </th>
                     <th class="pr plh pl_status pl-status" data-pc="status">SPHERE password
                     </th>
-                    <th class="pr plh pl_status pl-status" data-pc="status">Created
+                    <th class="pr plh pl_status pl-status" data-pc="status">Created (UTC)
+                    </th>
+                    <th class="pr plh pl_status pl-status" data-pc="status">Expires (UTC)
                     </th>
                     <th class="pr plh pl_status pl-status" data-pc="status">Console
                     </th>
-		    <th class="pr plh pl_status pl-status" data-pc="status">Poke
+		    <th class="pr plh pl_status pl-status" data-pc="status">Repair
+                    </th>
+		    <th class="pr plh pl_status pl-status" data-pc="status">Extend
                     </th>
 		    <th class="pr plh pl_status pl-status" data-pc="status">Stop
                     </th>

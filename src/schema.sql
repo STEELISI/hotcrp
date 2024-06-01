@@ -668,8 +668,8 @@ CREATE TABLE `VMs` (
   `vmdesc` varchar(256) NOT NULL,
   `paperId` int(11),
   `VNCpass` varchar(256) NOT NULL,
-  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `delete_time` DATETIME DEFAULT NULL,
+  `create_time` int(11) NOT NULL,
+  `end_time` int(11) NOT NULL,
   `active` int(11) DEFAULT 1,
   PRIMARY KEY (`vmid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
