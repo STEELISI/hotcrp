@@ -239,11 +239,13 @@ for (my $i = 3; $i <= $#ARGV; $i++)
 		system($cmd);
 		print "Existing user $username has been deleted, and new user will be created";
 	    }
-	    $cmd = "mrg sudo $username register $username $email \"$firstName $lastName\" \"$affiliation\" Researcher \"$country\" $usstate -p \"$password\" -o $org";
-	    # Execute the command in new process
+	    $cmd = "mrg register $username $email \"$firstName $lastName\" \"$affiliation\" Researcher \"$country\" $usstate -p \"$password\"";
 	    $result = system($cmd);
 	    if ($result == 0)
 	    {
+		# Assume requesting membership will work
+		$cmd = "mrg sudo --nokeys -u $username -p  \"$password\" -- mrg membership request organization user $org $username";
+		$result = system($cmd);
 		$cmd =  "mrg membership confirm organization user " . $opt{'clusterOrg'} . " " . $username;
 		$result = system($cmd);
 		if ($result == 0)

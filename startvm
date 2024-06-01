@@ -150,10 +150,12 @@ if ($sth->rows > 0)
     exit 0;
 }
 # Set server
-my $cmd="mrg config set server grpc.mod.deterlab.net";
-system($cmd);
 my $path=$opt{'webpath'} . "/secret";
 $ENV{HOME}=$path;
+my $cmd="mrg config set server grpc.mod.deterlab.net";
+system($cmd);
+my $cmd="sudo -u merge mrg config set server grpc.mod.deterlab.net";
+system($cmd);
 my $logincmd =  "mrg login " . $opt{'clusterUser'} . " -p \"" . $opt{'clusterPass'} . "\"";
 # Log in as conf admin and as www-data user
 $cmd = $logincmd;
@@ -220,12 +222,15 @@ for (my $i = 3; $i <= $#ARGV; $i++)
 		system($cmd);
 		print "Existing user $username has been deleted, and new user will be created";
 	    }
-	    $cmd = "mrg sudo -u $username register $username $email \"$firstName $lastName\" \"$affiliation\" Researcher \"$country\" $usstate -p \"$password\" -o $org";
+	    $cmd = "mrg register $username $email \"$firstName $lastName\" \"$affiliation\" Researcher \"$country\" $usstate -p \"$password\"";
 	    print "Registering new user\n";
 	    # Execute the command in new process
 	    $result = system($cmd);
 	    if ($result == 0)
 	    {
+		# Assume requesting membership will work
+		$cmd = "mrg sudo --nokeys -u $username -p  \"$password\" -- mrg membership request organization user $org $username";
+		$result = system($cmd);
 		$cmd =  "mrg membership confirm organization user " . $opt{'clusterOrg'} . " " . $username;
 		$result = system($cmd);
 		if ($result == 0)
@@ -249,6 +254,7 @@ for (my $i = 3; $i <= $#ARGV; $i++)
 		}
 		else
 		{
+		    exit 0;
 		    print "Registration of $username for email $email has worked but we could not activate the user. Please contact testbed ops.\n";
 		}
 	    }

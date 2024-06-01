@@ -2,7 +2,7 @@ PASS="putsomethinghere"
 
 # Install Apache and other necessary packages
 sudo apt update
-sudo apt install -y emacs apache2 php mariadb-server mariadb-client-core-10.6 php-fpm php-intl exim4-daemon-heavy php-mysql php-mbstring php-curl rpm at expect
+sudo apt install -y emacs apache2 php mariadb-server mariadb-client-core mariadb-client php-fpm php-intl exim4-daemon-heavy php-mysql php-mbstring php-curl rpm at expect
 sudo a2enmod php8.1 
 sudo service apache2 restart
 
@@ -18,6 +18,8 @@ sudo chown -R www-data:www-data /var/noVNC
 # Create user "merge" that can login
 sudo useradd -s /bin/bash "merge"
 echo "merge:$PASS" | sudo chpasswd
+sudo mkdir /home/merge
+sudo chown merge:merge /home/merge
 
 # Let www-data execute commands as user merge, this is needed for SSH tunnels
 echo "www-data    ALL=(merge) NOPASSWD: ALL" | sudo EDITOR='tee -a' visudo
