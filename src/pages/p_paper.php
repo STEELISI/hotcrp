@@ -213,23 +213,6 @@ class Paper_Page {
         // actually update
         $this->ps->execute_save();
 
-	if ($is_new)
-	{
-	      $query="select username, password from ClusterUsers where contactId=" . $this->user->contactId;
-              $result = $this->user->conf->qe($query);
-	      $username = "";
-	      $pass = "";
-	      foreach ($result as $row) {
-    	      	     $username = $row["username"];
-		     $pass=$row["password"];
-	      }
-
-	      $cmd="bash /var/www/html/cluster/createproject " . $username . " " . $pass . " paper " . $this->ps->paperId . " 2>&1";
-       	      //exec($cmd, $output, $retval);
-	      //$outs=implode($output);	
-	      $this->ps->prepend_msg($conf->_("<0> output " . $cmd), MessageSet::INFORM);
-	}
-
         $new_prow = $conf->paper_by_id($this->ps->paperId, $this->user, ["topics" => true, "options" => true]);
         if (!$new_prow) {
             $this->ps->prepend_msg($conf->_("<0>{Submission} not saved; please correct these errors and try again"), MessageSet::ERROR);

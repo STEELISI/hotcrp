@@ -3,9 +3,50 @@
 use strict;
 use warnings;
 use DBI;
+use Time::Local qw( timelocal_posix timegm_posix );
 
 $|=1;
 
+our @nodes = ();
+our $node = "node";
+
+sub parsenodes
+{
+    my $topofile=shift;
+    my $fh = new IO::File($topofile);
+    while(<$fh>)
+    {
+        if ($_ !~ /net\.node/)
+	{
+            next;
+        }
+	my $state = 0;
+        my @items = split /[\,\[\]\'\s]+/, $_;
+        for my $i (@items)
+	{
+	   if ($i eq "for" && $state == 0)
+	   {
+		$state = 1;
+	   }
+	   elsif ($i eq "name" && $state == 1)
+	   {	   
+		$state = 2;
+	   }
+	   elsif ($i eq "in" && $state == 2)
+           {
+                $state = 3;
+           }
+	   elsif($state == 3)
+	   {
+	       push(@nodes, $i);
+	       if ($node eq "node")
+	       {
+		   $node = $i;
+	       }		   
+	   }
+        }
+    }
+}
 
 sub randompass()
 {
@@ -95,21 +136,35 @@ my $paperID = $ARGV[0];
 my $vmtype = $ARGV[1];
 my $vncpass = $ARGV[2];
 my $SSH = "ssh -o StrictHostKeyChecking=no";
-
+my $proj = $opt{'clusterOrg'} . "p" . $paperID;
+my $vmid = "$vmtype.$proj";
+# Check that we haven't already allocated a VM for this paper
+my $query = 'SELECT * FROM VMs WHERE vmid like \'%.' . $proj . '\'';
+$sth = $dbh->prepare($query)
+    or die "prepare statement failed: $dbh->errstr()";
+$sth->execute() or die "execution failed: $dbh->errstr()";
+# If already allocated, bail out
+if ($sth->rows > 0)
+{
+    print "You have already allocated a VM for this paper. Please stop it before trying to allocate another one. \n";
+    print "DONE\n";
+    exit 0;
+}
 # Set server
+my $path=$opt{'webpath'} . "/secret";
+$ENV{HOME}=$path;
 my $cmd="mrg config set server grpc.mod.deterlab.net";
 system($cmd);
-# Log in and copy key to user merge
-my $path=$opt{'webpath'};
-my $logincmd =  "mrg login " . $opt{'clusterUser'} . " -p \"" . $opt{'clusterPass'} . "\"";
-$cmd = $logincmd;
+my $cmd="sudo -u merge mrg config set server grpc.mod.deterlab.net";
 system($cmd);
-$cmd = "cp $path/.ssh/merge_key /tmp/ 2>&1";
-my $output=`$cmd`;
-$cmd = "chmod g+r /tmp/merge_key 2>&1";
-$output=`$cmd`;
+my $logincmd =  "mrg login " . $opt{'clusterUser'} . " -p \"" . $opt{'clusterPass'} . "\"";
+# Log in as conf admin and as www-data user
+$cmd = $logincmd;
+my $result=system($cmd);
+# Log in as conf admin and as merge user
+$cmd = "sudo -H -u merge " . $logincmd;
+my $result=system($cmd);
 # Create a project for paper if it does not exist
-my $proj = $opt{'clusterOrg'} . "p" . $paperID;
 $cmd ="mrg show project $proj";
 print "Checking if project $proj exists\n";
 my $result = system($cmd);
@@ -168,12 +223,15 @@ for (my $i = 3; $i <= $#ARGV; $i++)
 		system($cmd);
 		print "Existing user $username has been deleted, and new user will be created";
 	    }
-	    $cmd = "mrg sudo -u $username register $username $email \"$firstName $lastName\" \"$affiliation\" Researcher \"$country\" $usstate -p \"$password\" -o $org";
+	    $cmd = "mrg register $username $email \"$firstName $lastName\" \"$affiliation\" Researcher \"$country\" $usstate -p \"$password\"";
 	    print "Registering new user\n";
 	    # Execute the command in new process
 	    $result = system($cmd);
 	    if ($result == 0)
 	    {
+		# Assume requesting membership will work
+		$cmd = "mrg sudo --nokeys -u $username -p  \"$password\" -- mrg membership request organization user $org $username";
+		$result = system($cmd);
 		$cmd =  "mrg membership confirm organization user " . $opt{'clusterOrg'} . " " . $username;
 		$result = system($cmd);
 		if ($result == 0)
@@ -192,11 +250,12 @@ for (my $i = 3; $i <= $#ARGV; $i++)
 		    $result = system($cmd);
 		    if ($result != 0)
 		    {
-			print "Membership update for project $proj and user $username failed";
+			print "Membership update for project $proj and user $username failed\n";
 		    }
 		}
 		else
 		{
+		    exit 0;
 		    print "Registration of $username for email $email has worked but we could not activate the user. Please contact testbed ops.\n";
 		}
 	    }
@@ -214,7 +273,7 @@ for (my $i = 3; $i <= $#ARGV; $i++)
 	$result = system($cmd);
 	if ($result != 0)
 	{
-	    print "Membership update for project $proj and user $username failed";
+	    print "Membership update for project $proj and user $username failed\n";
 	}
     }
     $sth->finish;
@@ -238,73 +297,121 @@ my $oh;
 open($oh, '>', $mconfig) or die $!;
 print $oh "                                                                                                                                                                                                                           
 Host *	
-    IdentityFile /tmp/merge_key
+    IdentityFile /home/merge/.ssh/merge_key
     ServerAliveInterval 30
     User $admin
     StrictHostKeyChecking no
     UserKnownHostsFile=/dev/null
-    ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i /tmp/merge_key -W %h:%p $admin\@jump.mod.deterlab.net";
+    ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i /home/merge/.ssh/merge_key -W %h:%p $admin\@jump.mod.deterlab.net";
 close($oh);
-$cmd="mrg list xdcs | grep xdc.$proj";
+$cmd="mrg list xdcs | grep xdc.$proj > /dev/null";
 $result=system($cmd);
 if ($result != 0)    
 {    
     # XDC needs to be created
-    print "Creating XDC xdc.$proj\n";
+    print "Creating XDC xdc.$proj this may take a bit\n";
     $cmd="mrg new xdc xdc.$proj";
     $result=system($cmd);
     
-    if ($result == 0)
-    {
-	sleep(30);
-	# Created XDC, now need to wait for it to be live
-	my $retries = 30;
-	for (my $tries = 0; $tries < $retries; $tries++)
-	{
-	    print "Checking if the XDC is up\n";
-	    $cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"ls ~\" 2>&1 < /dev/null ";
-	    $result=system($cmd);
-	    if ($result != 0)
-	    {
-		print "Result $result\n";
-		sleep(1);		
-	    }
-	    else
-	    {
-		print "XDC is now operational\n";
-		last;
-	    }
-	}
-	if ($result != 0)
-	{
-	    print "XDC did not come up within prescribed time\n";
-	    print "DONE";
-	    exit 1;
-	}
-    }
-    else
+    if ($result != 0)
     {
 	print "XDC creation has failed\n";
 	print "DONE";
 	exit 1;
     }
+    else
+    {
+	sleep(30);
+    }       
 }
-
-
-
+# Created XDC, now need to wait for it to be live
+my $retries = 30;
+for (my $tries = 0; $tries < $retries; $tries++)
+{
+    print "Checking if the XDC is up ... this may take a few minutes\n";
+    $cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"ls ~\" 2>&1 > /dev/null < /dev/null ";
+    $result=system($cmd);
+    if ($result != 0)
+    {
+	sleep(1);		
+    }
+    else
+    {
+	print "XDC is now operational\n";
+	last;
+    }
+}
+if ($result != 0)
+{
+    print "XDC did not come up within prescribed time, will delete it\n";
+    $cmd = "mrg delete xdc xdc.$proj";
+    system($cmd);
+    print "DONE";
+    exit 1;
+}
+my $custom="";
 if ($result == 0)
 {
     print "XDC exists and is running, we will now create the VM\n";
     # Now create the VM in that project
-    my $xdccmd="/share/staging/startexp -p $proj -n $vmtype -m /share/EAC/$vmtype/$vmtype.model $vmtype";
-    print "XDC command $xdccmd\n";
+    # Check if we have a custom topology
+    my $modelpath = "";
+    if ($vmtype eq "file")
+    {
+	# There is a custom topology, parse out the nodes and put them into nodes file
+	my $uploadspath=$opt{'webpath'} . "/uploads";
+	my $topofile =  $uploadspath . "/" . $vmtype . ".$proj.model";
+	parsenodes($topofile);
+	open(my $oh, ">", $uploadspath . "/" . $vmtype . ".$proj.nodes");
+	for my $n (@nodes)
+	{
+	    print $oh "$n\n";
+	}
+	close($oh);
+	# Do a sanity check, does it compile?
+	$cmd = "mrg compile " .  $uploadspath . "/" . $vmtype . ".$proj.model";
+	my $output = `$cmd`;
+	if ($output =~ /Error/)
+	{
+	    print "This model does not compile. Please check the topology file.\n";
+	    print "DONE";
+	    exit 1;
+	}
+	$cmd = "mrg xdc scp upload " . $uploadspath . "/" . $vmtype . ".$proj.model xdc.$proj:. 2>&1";
+	print "$cmd\n";
+	$result=system($cmd);
+	if ($result != 0)
+	{
+	    print "Could not upload the custom topology $vmtype.$proj.model to the testbed\n";
+	    print "DONE";
+	    exit 1;
+	}
+	# Assume second upload will work
+	$cmd = "mrg xdc scp upload " . $uploadspath . "/" . $vmtype . ".$proj.nodes xdc.$proj:.";
+	$result=system($cmd);
+	$custom="-n /home/$admin/$vmtype.$proj.nodes";
+	$modelpath = "/home/$admin/$vmtype.$proj.model";
+    }
+    else
+    {
+	$modelpath = "/share/EAC/$vmtype/$vmtype.model";
+    }
+    # Try to start the experiment
+    my $xdccmd="/share/staging/startexp -p $proj -n $vmtype -m $modelpath $vmtype";
+    print "$xdccmd\n";
     $cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"$xdccmd\"";
-
     $result=system($cmd);
     if ($result == 0)
     {
 	print "Experiment is now running\n";
 	# Insert info into DB
+	$cmd="mrg show realization real.$vmtype.$proj";
+	my $output=`$cmd| grep Expires | sed 's/Expires:  //'`;
+	$output =~ s/\n//;
+	#2024-06-08 17:16:24 +0000 UTC
+	my @items = split /[\s\-\:]/, $output;
+	my $end_time=timegm_posix($items[5], $items[4], $items[3], $items[2], $items[1]-1, $items[0]-1900);
+	my $create_time=time();
 	
 	my $sth = $dbh->prepare(
 	    'SELECT * FROM VMs WHERE vmid = ?')
@@ -312,17 +419,42 @@ if ($result == 0)
 	$sth->execute("$vmtype.$proj") or die "execution failed: $dbh->errstr()";
 	# If VM doesn't exist, insert info
 	if ($sth->rows == 0)
-	{	    
+	{
+	    $vncpass = substr(randompass(), 0, 8);
 	    $sth = $dbh->prepare(
-	    'INSERT INTO VMs(vmid, vmtype, VNCpass, vmdesc, paperId) values (?, ?, ?, ?, ?)')
+	    'INSERT INTO VMs(vmid, vmtype, VNCpass, vmdesc, paperId, create_time, end_time) values (?, ?, ?, ?, ?, ?, ?)')
 		or die "prepare statement failed: $dbh->errstr()";
-	    $sth->bind_param(1, "$vmtype.$proj");
+	    my $vmdesc = "";
+	    if ($vmtype eq "file")
+	    {
+		$vmdesc="Custom topology";
+	    }
+	    else
+	    {
+		$vmdesc = $vms{$vmtype};
+		push(@nodes, $node);
+	    }
+	       
+	    $sth->bind_param(1, $vmid);
 	    $sth->bind_param(2, $vmtype);
 	    $sth->bind_param(3, $vncpass);	
-	    $sth->bind_param(4, $vms{$vmtype});
+	    $sth->bind_param(4, $vmdesc);
 	    $sth->bind_param(5, $paperID);
+	    $sth->bind_param(6, $create_time);
+	    $sth->bind_param(7, $end_time);
 	    $sth->execute or die "execution failed: $dbh->errstr()";
 	    $sth->finish;
+	    # Remember all the nodes that a user could access
+	    for my $n (@nodes)
+	    {
+		$sth = $dbh->prepare(
+		    'INSERT INTO VMnodes(vmid, node) values (?, ?)')
+		    or die "prepare statement failed: $dbh->errstr()";
+		$sth->bind_param(1, $vmid);
+		$sth->bind_param(2, $n);
+		$sth->execute or die "execution failed: $dbh->errstr()";		
+		$sth->finish;
+	    }
 	}
 	for (my $i = 3; $i <= $#ARGV; $i++)
 	{
@@ -347,6 +479,18 @@ if ($result == 0)
 		$sth->bind_param(2, $id);
 		$sth->execute or die "execution failed: $dbh->errstr()";
 		$sth->finish;
+		# Also reserve ports
+		for my $n (@nodes)
+		{
+		    $sth = $dbh->prepare(
+			'INSERT INTO Ports (vmid, contactId, node) values (?, ?, ?)')
+			or die "prepare statement failed: $dbh->errstr()";
+		    $sth->bind_param(1, "$vmtype.$proj");
+		    $sth->bind_param(2, $id);
+		    $sth->bind_param(3, $n);
+		    $sth->execute or die "execution failed: $dbh->errstr()";
+		    $sth->finish;
+		}
 	    }
 	}
     }
@@ -363,7 +507,7 @@ my $running = 0;
 for (my $tries = 0; $tries < $retries; $tries++)
 {
     print "Checking if node is reachable\n";
-    my $xdccmd="ping -c 1 node";
+    my $xdccmd="ping -c 1 $node";
     $cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"$xdccmd\"";
     open(my $cmdh, " $cmd | ");
     my $output = "";
@@ -382,7 +526,7 @@ for (my $tries = 0; $tries < $retries; $tries++)
 if ($running)
 {
     print "Setting up experiment\n";
-    $cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"/share/staging/runlab -f /share/EAC -v $vncpass $vmtype\" 2>&1 < /dev/null ";
+    $cmd = "sudo -H -u merge $SSH -F $mconfig xdc-$proj \"/share/staging/runlab -f /share/EAC $custom -v $vncpass $vmtype\" 2>&1 < /dev/null ";
     $result=system($cmd);
     if ($result != 0)
     {

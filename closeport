@@ -1,0 +1,95 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use DBI;
+
+$|=1;
+
+my $SSH = "ssh -o StrictHostKeyChecking=no";
+    
+# Take paper ID, type of VM to stop and user ID
+# and set up SSH tunnel and novnc proxy
+
+my $usage="$0 port vncpass\n";
+my %opt = ();
+
+
+if ($#ARGV < 1)
+{
+    print $usage;
+    print "DONE";
+    exit 1;
+}
+my $port = 10000 + $ARGV[0];
+my $vncpass = $ARGV[1];
+
+# Read info from conf/options.php
+# to get orgName, dbUser, etc.
+my $mytime = time();
+print "Closing now time $mytime\n";
+my $fh = new IO::File("conf/options.php");
+while (<$fh>)
+{
+    if ($_ =~ /\$Opt/ && $_ =~ /\=/)
+    {
+	my @arr = split /[\[\]\"\=\s+\;]/, $_;	
+	if ($#arr > 3)
+	{
+	    my $intake = 0;
+	    for my $a (@arr)
+	    {
+		if ($a !~ /[\[\]\"\=\s+]/ && $a =~ /[a-zA-Z0-9]/)
+		{
+		    if ($a =~ /^\$Opt/)
+		    {
+			$intake = 1;
+			next;
+		    }
+		    if ($intake =~ /^[0-9]$/ && $intake == 1)
+		    {
+			$opt{$a} = 0;
+			$intake = $a;
+		    }
+		    else
+		    {
+			$opt{$intake} = $a;
+			last;
+		    }
+		}
+	    }
+	}
+    }
+}
+close($fh);
+
+
+my $dsn = "DBI:mysql:database=$opt{'dbName'}";
+my $dbh = DBI->connect($dsn, $opt{'dbUser'}, $opt{'dbPassword'});
+my $sth = $dbh->prepare(
+	'SELECT * from VMs where VNCpass = ?')
+	or die "prepare statement failed: $dbh->errstr()";
+$sth->execute($vncpass) or die "execution failed: $dbh->errstr()";
+if ($sth->rows() > 0)
+{
+    my $output = `ps axuw |grep "localhost:$port"`;
+    my @line = split /\n/, $output;
+    for my $l (@line)
+    {
+	print "$l\n";
+	my @items = split /\s+/, $l;
+	my $owner = $items[0];
+	my $pid = $items[1];
+	if ($owner eq "merge")
+	{
+	    my $cmd = "sudo -u merge kill -9 " . $items[1];
+	    system($cmd);
+	    print "Closed process $items[1]\n";
+	}
+    }
+}
+else
+{
+    print "No such password $vncpass\n";
+}
+print "DONE";

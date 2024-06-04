@@ -620,7 +620,31 @@ CREATE TABLE `TopicInterest` (
   PRIMARY KEY (`contactId`,`topicId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+--
+-- Table structure for table `Ports`
+--
 
+DROP TABLE IF EXISTS `Ports`;
+CREATE TABLE `Ports` (
+  `portId` int(11) NOT NULL AUTO_INCREMENT,
+  `vmid` varchar(256) NOT NULL,
+  `contactId` int(11) NOT NULL,
+  `node` varchar(256) NOT NULL,
+  PRIMARY KEY (`portId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+--
+-- Table structure for table `VMnodes`
+--
+
+DROP TABLE IF EXISTS `VMnodes`;
+CREATE TABLE `VMnodes` (
+  `vmid` varchar(256) NOT NULL,
+  `node`  varchar(256) NOT NULL,
+  PRIMARY KEY (`vmid`, `node`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 --
 -- Table structure for table `VMaccess`
@@ -644,8 +668,8 @@ CREATE TABLE `VMs` (
   `vmdesc` varchar(256) NOT NULL,
   `paperId` int(11),
   `VNCpass` varchar(256) NOT NULL,
-  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `delete_time` DATETIME DEFAULT NULL,
+  `create_time` int(11) NOT NULL,
+  `end_time` int(11) NOT NULL,
   `active` int(11) DEFAULT 1,
   PRIMARY KEY (`vmid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

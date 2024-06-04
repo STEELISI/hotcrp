@@ -524,6 +524,9 @@ class Home_Page {
     private function print_vm_interface(Contact $user) {
 
         include_once('src/pve_api/pve_functions.php');
+	echo '<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>';
+    	echo '<script type="text/javascript" src="scripts/utils.js"></script>';
+
         $conf = $user->conf;
         $any_open = false;
         if ($user->is_empty()) {
@@ -553,28 +556,37 @@ class Home_Page {
 		$spass = $sph['password'];
 
 	   }
-            if ($user->is_admin()) {
-                $vmdata = Dbl::qe($db, "select * from VMs where active = 1");
+	       
+	$vmdata = Dbl::qe($db, "SELECT * FROM VMs as v left join VMaccess as vma on v.vmId = vma.vmId left join Ports p on v.vmId = p.vmid WHERE vma.contactId = ? AND vma.contactId = p.contactId AND active = 1 ORDER BY v.vmid;", $cid['contactId']);
 
-            } else {
-                $vmdata = Dbl::qe($db, "SELECT * FROM VMs as v left join VMaccess as vma on v.vmId = vma.vmId  WHERE contactId = ? AND active = 1 ORDER BY v.vmid;", $cid['contactId']);
-            }
             foreach ($vmdata as $vm){
 	    	    $vmid = $vm['vmid'];
-		    echo "ID $vmid";
+		    $index = $vmid . " node " . $vm['node'];
 		    $vmdesc = $vm['vmdesc'];
-		    $vms[$vmid] = array();
-                    $vms[$vmid]['type'] = $vm['vmtype'];
-                    $vms[$vmid]['paper'] = $vm['paperId'];
+		    $vms[$index] = array();
+		    $vms[$index]['vmid'] = $vm['vmid'];
+		    $vms[$index]['type'] = $vm['vmtype'];
+		    $vms[$index]['node'] = $vm['node'];
+		    $node = $vm['node'];
+		    $offset = $vm['portId'];
+                    $vms[$index]['paper'] = $vm['paperId'];
 		    $createhash = random_str(15);
-		    $vms[$vmid]['pass'] = $vm['VNCpass'];
-		    $vms[$vmid]['suid'] = $suid;
-		    $vms[$vmid]['spass'] = $spass;		    
-
-		    $vms[$vmid]['started'] = $vm['create_time'];
-		    $vms[$vmid]['console'] = "<a href=\"startvm.php?type=" . $vm['vmtype'] . "&action=console&pid=" . $vm['paperId'] . "&vmid=" . $vmid . "&createhash=" . $createhash . "\" target=new>console</a>";
-		    $vms[$vmid]['reset'] = "<a href=\"startvm.php?type=" . $vm['vmtype'] . "&action=reset&pid=" . $vm['paperId'] . "&vmid=" . $vmid . "&createhash=" . $createhash . "\" target=new>reset</a>";
-		    $vms[$vmid]['stop'] = "<a href=\"startvm.php?type=" . $vm['vmtype'] . "&action=stop&pid=" . $vm['paperId'] . "&vmid=" . $vmid . "&createhash=" . $createhash . "\" target=new>stop</a>";		    
+		    $vms[$index]['pass'] = $vm['VNCpass'];
+		    $vncpass = $vm['VNCpass'];
+		    $vms[$index]['suid'] = $suid;
+		    $vms[$index]['spass'] = $spass;		    
+		    
+		    $vms[$index]['started'] = date('r', $vm['create_time']);
+		    $vms[$index]['ends'] = date('r', $vm['end_time']);
+		    $consoleurl = "startvm.php?type=" . $vm['vmtype'] . "&action=console&pid=" . $vm['paperId'] . "&vmid=" . $vmid . "&createhash=" . $createhash . "&node=" . $node;
+		    $vms[$index]['console'] = "<a href=\"$consoleurl\" target=new>console</a>"; 
+		    //child.onunload = closeport(" . $offset . ",'" . $vncpass . "');\">console</a>";
+		    $createhash = random_str(15);
+		    $vms[$index]['reset'] = "<a href=\"startvm.php?type=" . $vm['vmtype'] . "&action=reset&pid=" . $vm['paperId'] . "&vmid=" . $vmid . "&createhash=" . $createhash . "\" target=new>repair</a>";
+		    $createhash = random_str(15);
+		    $vms[$index]['extend'] = "<a href=\"startvm.php?type=" . $vm['vmtype'] . "&action=extend&pid=" . $vm['paperId'] . "&vmid=" . $vmid . "&createhash=" . $createhash . "\" target=new>extend</a>";
+		    $createhash = random_str(15);
+		    $vms[$index]['stop'] = "<a href=\"startvm.php?type=" . $vm['vmtype'] . "&action=stop&pid=" . $vm['paperId'] . "&vmid=" . $vmid . "&createhash=" . $createhash . "\" target=new>stop</a>";		    
 		    }		 	   
         };
         
@@ -584,11 +596,13 @@ class Home_Page {
         echo '<div id="foldre" class="homesubgrp">
                     <table class="pltable pltable-reviewerhome has-hotlist fold2c fold4c fold7c fold8c">';
 
-        echo '  
+        	    echo '  
                     <tr class="pl_headrow">
                     <th class="pr plh pl_id" data-pc="id">ID
                     </th>
                     <th class="pr plh pl_type" data-pc="type">Type
+                    </th>
+	            <th class="pr plh pl_type" data-pc="type">Node
                     </th>
                     <th class="pr plh pl_status pl-status" data-pc="status">Paper #
                     </th>	  
@@ -598,11 +612,15 @@ class Home_Page {
                     </th>
                     <th class="pr plh pl_status pl-status" data-pc="status">SPHERE password
                     </th>
-                    <th class="pr plh pl_status pl-status" data-pc="status">Created
+                    <th class="pr plh pl_status pl-status" data-pc="status">Created (UTC)
+                    </th>
+                    <th class="pr plh pl_status pl-status" data-pc="status">Expires (UTC)
                     </th>
                     <th class="pr plh pl_status pl-status" data-pc="status">Console
                     </th>
-		    <th class="pr plh pl_status pl-status" data-pc="status">Poke
+		    <th class="pr plh pl_status pl-status" data-pc="status">Repair
+                    </th>
+		    <th class="pr plh pl_status pl-status" data-pc="status">Extend
                     </th>
 		    <th class="pr plh pl_status pl-status" data-pc="status">Stop
                     </th>
@@ -612,10 +630,7 @@ class Home_Page {
         $tag = '';
         foreach ($vms as $vmid => $vminfo ){
 	
-            echo '<tr class="pl '.$tag.' k0 plnx" data-pid="'.$vmid.'" data-tags="'.$vms[$vmid]["fqdn"].'">'."\n";
-            echo '<td class="pr pr_id">';
-            echo $vmid; 
-            echo '</td>';
+            echo '<tr class="pl '.$tag.' k0 plnx" data-pid="'.$vmid.'">'."\n";
             if ($tag == '') {
                 $tag = 'tag-gray';
             } else {

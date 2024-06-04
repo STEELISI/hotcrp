@@ -27,11 +27,11 @@ my $SSH = "ssh -o StrictHostKeyChecking=no";
 # Take paper ID, type of VM to stop and user ID
 # and set up SSH tunnel and novnc proxy
 
-my $usage="$0 paper-ID vm-type user-ID\n";
+my $usage="$0 paper-ID vm-type user-ID node-ID\n";
 my %opt = ();
 
 
-if ($#ARGV < 2)
+if ($#ARGV < 3)
 {
     print $usage;
     print "DONE";
@@ -82,21 +82,37 @@ my $sth;
 my $paperID = $ARGV[0];
 my $vmtype = $ARGV[1];
 my $userID = $ARGV[2];
+my $nodeID = $ARGV[3];
 # Set server
+my $path=$opt{'webpath'} . "/secret";
+$ENV{HOME}=$path;
 my $cmd="mrg config set server grpc.mod.deterlab.net";
 system($cmd);
 my $proj = $opt{'clusterOrg'} . "p" . $paperID;
 my $vmid = $vmtype . "." . $proj;
+# Org owner will always have an account on VM even when they are not a reviewer or author
+my $ownerusername = $opt{'clusterUser'};
+my $hasaccess = 0;
+# Check if org owner is on the list for access to this VM
+$sth = $dbh->prepare(
+	'SELECT * FROM VMaccess vm left join ClusterUsers cu on vm.contactID=cu.contactID where vmid = ? and vm.contactID = 1')
+        or die "prepare statement failed: $dbh->errstr()";
+$sth->execute($vmid) or die "execution failed: $dbh->errstr()";
+if ($sth->rows > 0)
+{
+    $hasaccess=1;
+}
 # Calculate which terminal ID should user have
 $sth = $dbh->prepare(
-	'SELECT contactID FROM VMaccess where vmid = ? order by contactID asc ')
+	'SELECT username, vm.contactID FROM VMaccess vm left join ClusterUsers cu on vm.contactID=cu.contactID where vmid = ? order by contactID asc ')
 	or die "prepare statement failed: $dbh->errstr()";
 $sth->execute($vmid) or die "execution failed: $dbh->errstr()";
 my $i=0;
 my $found=0;
+my $username = "";
 while (my $ref = $sth->fetchrow_hashref()) {
     my $ID = $ref->{'contactID'};
-    print "My id $userID current $ID i $i\n";
+    $username = $ref->{'username'};
     if ($ID == $userID)
     {
 	$found = 1;
@@ -111,23 +127,58 @@ if ($found == 0)
     exit 1;
 }
 my $termID = $i;
+# Now check if org owner's presence on that VM intereferes with termID calculation
+if (!$hasaccess && $ownerusername lt $username)
+{
+    print "Has acess $hasaccess owner $ownerusername mine $username\n";
+    $termID++;
+}
+# Find port numbers that would go with this instance
+$sth = $dbh->prepare(
+        'SELECT portId FROM Ports where vmid = ? and contactId = ? and node = ?')
+    or die "prepare statement failed: $dbh->errstr()";
+$sth->bind_param(1, "$vmid");
+$sth->bind_param(2, $userID);
+$sth->bind_param(3, "$nodeID");
+$sth->execute() or die "execution failed: $dbh->errstr()";
+my $offset = 0;
+if ($sth->rows > 0)
+{
+    my $ref = $sth->fetchrow_hashref();
+    $offset = $ref->{'portId'};
+}
+else
+{
+    $sth = $dbh->prepare(
+        'INSERT INTO Ports(vmid, contactId, node) values (?, ?, ?)')
+	or die "prepare statement failed: $dbh->errstr()";
+    $sth->bind_param(1, "$vmid");
+    $sth->bind_param(2, $userID);
+    $sth->bind_param(3, "$nodeID");
+    $sth->execute() or die "execution failed: $dbh->errstr()";
+    $sth = $dbh->prepare(
+        'SELECT portId FROM Ports where vmid = ? and contactId = ? and node = ?')
+	or die "prepare statement failed: $dbh->errstr()";
+    $sth->bind_param(1, "$vmid");
+    $sth->bind_param(2, $userID);
+    $sth->bind_param(3, "$nodeID");
+    $sth->execute() or die "execution failed: $dbh->errstr()";
+    my $ref = $sth->fetchrow_hashref();
+    $offset = $ref->{'portId'};
+}    
 my $vncport = $termID + 5900;
-my $port = 10000 + $userID + 50*$paperID;
-my $proxyport = 6080 + $userID + 50*$paperID;
-
-print "Port $port proxyport $proxyport\n";
-
-my $path=$opt{'webpath'};
+my $port = 10000 + $offset;
+my $proxyport = 6080 + $offset;
+print "Port $port proxyport $proxyport term ID $termID offset $offset\n";
 my $config = "$path/config";
 my $admin=$opt{'clusterUser'};
 my $logincmd =  "mrg login " . $opt{'clusterUser'} . " -p \"" . $opt{'clusterPass'} . "\"";
+# Log in as conf admin and as www-data user
 $cmd = $logincmd;
 my $result=system($cmd);
-print "Result $result\n";
-$cmd = "cp $path/.ssh/merge_key /tmp/ 2>&1";
-my $output=`$cmd`;
-$cmd = "chmod g+rw /tmp/merge_key 2>&1";
-$output=`$cmd`;
+# Log in as conf admin and as merge user
+$cmd = "sudo -H -u merge " . $logincmd;
+my $result=system($cmd);
 open(my $oh, '>', $config); # or die $!;
 print $oh "
 Host *
@@ -142,24 +193,22 @@ my $mconfig = "/tmp/config";
 open($oh, '>', $mconfig); # or die $!;
 print $oh "                                                                                                                                                                                                                           
 Host *	
-    IdentityFile /tmp/merge_key
+    IdentityFile /home/merge/.ssh/merge_key
     ServerAliveInterval 30
     User $admin
     StrictHostKeyChecking no
     UserKnownHostsFile=/dev/null
-    ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i /tmp/merge_key -W %h:%p $admin\@jump.mod.deterlab.net";
+    ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i /home/merge/.ssh/merge_key -W %h:%p $admin\@jump.mod.deterlab.net";
 close($oh);
-$output = `ps axuw | grep ssh | grep "localhost:$port " | wc | awk '{print \$1}'`;
+my $output = `ps axuw | grep ssh | grep "localhost:$port " | wc | awk '{print \$1}'`;
 if ($output <= 1)
 {
     # Delete known_hosts on XDC just in case
     my $xdccmd = "rm /home/" . $opt{'clusterUser'} . "/.ssh/known_hosts 2>&1";
-    print "XDC cmd $xdccmd";
-    $cmd = "sudo -H -u merge ssh -F $mconfig xdc-$proj \"$xdccmd\"";
-    $output=`$cmd`;
-    my $result=system($cmd);
-    print "Creating new SSH tunnel";
-    $cmd = "nohup sudo -H -u merge ssh -F $mconfig -L " . $port . ":localhost:" . $port . " xdc-$proj -t ssh -L " . $port . ":localhost:" . $vncport . " -N node 2>&1 </dev/null &";
+    $cmd = "sudo -u merge ssh -F $mconfig xdc-$proj \"$xdccmd\"";
+    $result=system($cmd);
+    print "Creating new SSH tunnel\n";
+    $cmd = "sudo -u merge ssh -F $mconfig -L " . $port . ":localhost:" . $port . " xdc-$proj -t ssh -L " . $port . ":localhost:" . $vncport . " -N " . $nodeID . " 2>&1 </dev/null &";
     $result=system($cmd);
     if ($result != 0)
     {
@@ -171,8 +220,8 @@ if ($output <= 1)
 $output = `ps axuw | grep novnc_proxy | grep "localhost:$port " | wc | awk '{print \$1}'`;
 if ($output <= 1)
 {
-    print "Starting novnc proxy";
-    $cmd = "/var/noVNC/utils/novnc_proxy --vnc localhost:" . $port . " --listen $proxyport 2>&1 &";
+    print "Starting novnc proxy\n";
+    $cmd = "sudo -u merge /var/noVNC/utils/novnc_proxy --vnc localhost:" . $port . " --listen $proxyport 2>&1 &";
     my $result=system($cmd);
     if ($result != 0)
     {
@@ -181,5 +230,4 @@ if ($output <= 1)
 	exit 1;
     }
 }
-print "User $userID term ID $termID\n";
 print "DONE";

@@ -7,26 +7,13 @@ use DBI;
 $|=1;
 
 
-sub randompass()
-{
-	my @alphanumeric = ('a'..'z', 'A'..'Z', 0..9,'!','_','-');
-	my @numeric = (0..9);
-	my $randpassword = '';
-
-	while ( length($randpassword) < 8 ) {
-              $randpassword = $randpassword . join '', map $alphanumeric[rand @alphanumeric], 0..(rand @numeric);
-	}
-	$randpassword .= '#';
-	return $randpassword;
-}
-
 # We will just rebuild experiment name and 
-# delete the experiment
+# extend lifetime
 my $SSH = "ssh -o StrictHostKeyChecking=no";
     
 # Take paper ID, type of VM to stop
 # and build a name
-# like stopvm 2 small 
+# like extend 2 small 
 
 my $usage="$0 paper-ID vm-type\n";
 my %opt = ();
@@ -88,45 +75,28 @@ my $path=$opt{'webpath'} . "/secret";
 $ENV{HOME}=$path;
 my $cmd="mrg config set server grpc.mod.deterlab.net";
 system($cmd);
-# Call stopexp
+# Call mrg update
 my $logincmd =  "mrg login " . $opt{'clusterUser'} . " -p \"" . $opt{'clusterPass'} . "\"";
 my $proj = $opt{'clusterOrg'} . "p" . $paperID;
 my $vmid = $vmtype . "." . $proj;
 # Log in as conf admin and as www-data user
 $cmd = $logincmd;
 my $result=system($cmd);
-$cmd = "mrg delete experiment $vmtype.$proj";
+$cmd = "mrg update realization expiration real.$vmtype.$proj 1w";
 my $result = system($cmd);
 if ($result != 0)
 {
-    print "Experiment could not be stopped";
+    print "VM lifetime could not be extended\n";
     print "DONE";
     exit 1;
 }
-# Also delete XDC
-$cmd = "mrg delete xdc xdc.$proj";
-$result = system($cmd);
-if ($result != 0)
-{
-    print "XDC could not be deleted";
-    print "DONE";
-    exit 1;
-}
-# Remove user access
+my $new_time=time() + 7*24*3600;
 $sth = $dbh->prepare(
-	'DELETE FROM VMs where vmid = ?')
-	or die "prepare statement failed: $dbh->errstr()";
-$sth->execute($vmid) or die "execution failed: $dbh->errstr()";
-$sth = $dbh->prepare(
-	'DELETE FROM VMaccess where vmid = ?')
-	or die "prepare statement failed: $dbh->errstr()";
-$sth->execute($vmid) or die "execution failed: $dbh->errstr()";
-$sth = $dbh->prepare(
-	'DELETE FROM VMnodes where vmid = ?')
-	or die "prepare statement failed: $dbh->errstr()";
-$sth->execute($vmid) or die "execution failed: $dbh->errstr()";
-$sth = $dbh->prepare(
-	'DELETE FROM Ports where vmid = ?')
-	or die "prepare statement failed: $dbh->errstr()";
-$sth->execute($vmid) or die "execution failed: $dbh->errstr()";
-print "DONE";
+    'UPDATE VMs set end_time=? WHERE vmid=?')
+    or die "prepare statement failed: $dbh->errstr()";
+$sth->bind_param(1, $new_time);
+$sth->bind_param(2, $vmid);
+$sth->execute or die "execution failed: $dbh->errstr()";
+$sth->finish;
+print "DONE\n";
+exit 0;

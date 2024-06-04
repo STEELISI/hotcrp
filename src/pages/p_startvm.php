@@ -64,11 +64,12 @@ class StartVm_Page {
     	$createhash=$_GET['createhash'];
 	$vmtype=$_GET['vm-types'];
 	
-	
+	$topo=$_GET['topo'];
+
         if (!($db = $user->conf->contactdb())) {
             $db = $user->conf->dblink;
         }
-      	      include_once('src/pve_api/pve_functions.php');
+      	    include_once('src/pve_api/pve_functions.php');
             $qreq->print_header("Creating a New VM", "createvm");
 
 	    $people=[];
@@ -95,18 +96,21 @@ class StartVm_Page {
 	    	  $id = $row[0];
 		  array_push($people, $id);
 	    }
-	    $cmd = "bash firestartvm " . $this->pid . " " . $vmtype . " " . $createhash . " ";
+
+	    if ($topo == "file")
+	    {
+	        $vmtype = "file";
+	    }
+	    $cmd = "perl startvm " . $this->pid . " " . $vmtype . " " . $createhash . " ";
 	    foreach ($people as $p)
 	    {
 		$cmd = $cmd . " " . $p;
        	    }
-	    echo $cmd;
 
 	    echo '<p><textarea id="startvm_log" name="startvm_log" rows="40" cols="100"></textarea><p>';
 	    echo '<p><input type="submit" value="Close" id="closeButton" style="display: none;" onclick="window.close();">';
 	    $_SESSION["filename"] = $_GET['createhash'];
 
-	    // count the lines exist in the file
 	    $file = 'data/'. $_SESSION["filename"];
 	    $result=exec("touch " . $file);
 	    $cmd = $cmd . " 2>&1 >> " . $file;
@@ -135,20 +139,18 @@ class StartVm_Page {
 
             $qreq->print_header("Stopping the VM", "stopvm");
 
-	    $cmd = "bash firestopvm " . $this->pid . " " . $vmtype;
-	    echo $cmd;
+	    $cmd = "perl stopvm " . $this->pid . " " . $vmtype;
 	    echo '<p><textarea id="startvm_log" name="startvm_log" rows="40" cols="100"></textarea><p>';
 	    echo '<p><input type="submit" value="Close" id="closeButton" style="display: none;" onclick="window.close();">';
 	    $_SESSION["filename"] = $_GET['createhash'];
 
-	    // count the lines exist in the file
 	    $file = 'data/'. $_SESSION["filename"];
 	    $result=exec("touch " . $file);
 	    $cmd = $cmd . " 2>&1 >> " . $file;
 	    $cmd = "echo \"" . $cmd . "\" | at -m now";
 	    $this->get_log($file);
 	    $output = shell_exec($cmd);
-    }
+       }
     }
     
     function reset_vm(Contact $user, Qrequest $qreq, $vmid) {
@@ -168,7 +170,7 @@ class StartVm_Page {
         } else {
             include_once('src/pve_api/pve_functions.php');
 
-            $qreq->print_header("Resetting the VM", "resetvm");
+            $qreq->print_header("Repairing the VM", "resetvm");
 
 	    $people=[];
 	    $result = Dbl::qe($db, "select authorInformation from Paper WHERE paperID = ?;", $this->pid);
@@ -194,17 +196,17 @@ class StartVm_Page {
 	    	  $id = $row[0];
 		  array_push($people, $id);
 	    }
-	    $cmd = "bash fireresetvm " . $this->pid . " " . $vmtype . " " . $createhash . " ";
+	    $cmd = "perl resetvm " . $this->pid . " " . $vmtype . " " . $createhash . " ";
 	    foreach ($people as $p)
 	    {
 		$cmd = $cmd . " " . $p;
        	    }
-	    echo $cmd;
+
+
 	    echo '<p><textarea id="startvm_log" name="startvm_log" rows="40" cols="100"></textarea><p>';
 	    echo '<p><input type="submit" value="Close" id="closeButton" style="display: none;" onclick="window.close();">';
 	    $_SESSION["filename"] = $_GET['createhash'];
 
-	    // count the lines exist in the file
 	    $file = 'data/'. $_SESSION["filename"];
 	    $result=exec("touch " . $file);
 	    $cmd = $cmd . " 2>&1 >> " . $file;
@@ -214,7 +216,7 @@ class StartVm_Page {
     }
 }
 
-    function console_vm(Contact $user, Qrequest $qreq, $vmid) {
+   function extend_vm(Contact $user, Qrequest $qreq, $vmid) {
         $createhash=$_GET['createhash'];	
 	$vmtype=$_GET['type'];
 	
@@ -231,36 +233,78 @@ class StartVm_Page {
         } else {
             include_once('src/pve_api/pve_functions.php');
 
-	    $cmd = "bash fireconsolevm " . $this->pid . " " . $vmtype . " " . $user->contactId;
-	    echo $cmd;
-	    
+            $qreq->print_header("Extending the VM", "extendvm");
+
+	    $cmd = "perl extendvm " . $this->pid . " " . $vmtype . " " . $createhash . " ";
+
+	    echo '<p><textarea id="startvm_log" name="startvm_log" rows="40" cols="100"></textarea><p>';
+	    echo '<p><input type="submit" value="Close" id="closeButton" style="display: none;" onclick="window.close();">';
 	    $_SESSION["filename"] = $_GET['createhash'];
 
-	    // count the lines exist in the file
+	    $file = 'data/'. $_SESSION["filename"];
+	    $result=exec("touch " . $file);
+	    $cmd = $cmd . " 2>&1 >> " . $file;
+	    $cmd = "echo \"" . $cmd . "\" | at -m now";
+	    $this->get_log($file);
+	    $output = shell_exec($cmd);
+     }
+  }
+
+    function console_vm(Contact $user, Qrequest $qreq, $vmid) {
+        $createhash=$_GET['createhash'];	
+	$vmtype=$_GET['type'];
+	$node=$_GET['node'];
+
+        if (!($db = $user->conf->contactdb())) {
+            $db = $user->conf->dblink;
+        }
+        $result = Dbl::qe($db, "SELECT * FROM VMaccess vma left join VMs vm on vma.vmid=vm.vmid WHERE contactId = ? and vm.vmId = ?;", $user->contactId, $vmid);
+	
+        if (!$result->fetch_assoc()) {
+            $qreq->print_header("Access Denied", "createvm");
+
+            echo '<p>You do not have access to this VM.</p>';
+
+            $qreq->print_footer();
+        } else {
+            include_once('src/pve_api/pve_functions.php');
+	    
+
+	    $cmd = "perl consolevm " . $this->pid . " " . $vmtype . " " . $user->contactId . " " . $node;
+	    $_SESSION["filename"] = $_GET['createhash'];
+
 	    $file = 'data/'. $_SESSION["filename"];
 	    $result=exec("touch " . $file);
 	    $cmd = $cmd . " 2>&1 >> " . $file;
 	    $output = shell_exec($cmd);
-	    $vncport = 6080 + $user->contactId + 50*$this->pid;
-	    $consoleurl = "http://" . $_SERVER['HTTP_HOST'] . ":" . $vncport . "/vnc.html";
-	    echo "<script> child=window.open('" . $consoleurl . "'); child.onunload = function(){ console.log('Child window closed'); };</script>";
-       	    exit;	 
-    }
+
+	    $query = "select portID, VNCpass from Ports p left join VMs v on p.vmid = v.vmid WHERE p.vmid = \"" . $vmid . "\" and contactId = " . $user->contactId . " and node = \"" . $node . "\"";
+	    
+	    $result = Dbl::qe($db, $query);
+
+	    while($row = $result->fetch_row())
+	    {
+		$offset = $row[0];
+		$vncpass = $row[1];
+	    }
+	    $vncport = 6080 + $offset;
+	    $consoleurl = "openconsole.php?port=$vncport&offset=$offset&pass=$vncpass";
+	    echo "<script> window.open('" . $consoleurl . "', '_self') </script>";
+	    exit;	 
+      }
+}
    
-   }
     
-    static function go(Contact $user, Qrequest $qreq) {
+static function go(Contact $user, Qrequest $qreq) {
+
         if (!$user->email) {
             $user->escape();
-
-        //} else if (!$user->is_reviewer() || !$user->is_vm_user()) {
-        //} else if (!$user->is_reviewer() || !$user->is_user()) {
-        //    Multiconference::fail($qreq, 403, ["title" => "Create VM"], "<0>You are not allowed to start a VM for this conference!");
         }
 
         if ($qreq->post && $qreq->post_empty()) {
             $user->conf->post_missing_msg();
         }
+	
         $op = new StartVm_Page($user, $qreq);
 
         if ($qreq->post && $qreq->valid_post()) {
@@ -270,6 +314,8 @@ class StartVm_Page {
                 $op->create_vm($user, $qreq);
             } elseif ($_GET['action'] == 'reset' && array_key_exists('vmid', $_GET)) {
                 $op->reset_vm($user, $qreq, $_GET['vmid']);
+             } elseif ($_GET['action'] == 'extend' && array_key_exists('vmid', $_GET)) {
+                $op->extend_vm($user, $qreq, $_GET['vmid']);
 	    } elseif ($_GET['action'] == 'console' && array_key_exists('vmid', $_GET)) {
                 $op->console_vm($user, $qreq, $_GET['vmid']);
 	    } elseif ($_GET['action'] == 'stop' && array_key_exists('vmid', $_GET)) {
