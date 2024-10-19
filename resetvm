@@ -148,7 +148,7 @@ $ENV{HOME}=$path;
 print "HOME is " . $ENV{HOME} . "\n";
 
 # Set server
-my $cmd="mrg config set server grpc.mod.deterlab.net";
+my $cmd="mrg config set server grpc.sphere-testbed.net";
 system($cmd);
 # Create a project for paper if it does not exist
 my $logincmd =  "mrg login " . $opt{'clusterUser'} . " -p \"" . $opt{'clusterPass'} . "\" 2>&1";
@@ -178,7 +178,7 @@ Host *
      ServerAliveInterval 30
      User $admin
      StrictHostKeyChecking no
-     ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i $path/.ssh/merge_key -W %h:%p $admin\@jump.mod.deterlab.net";
+     ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i $path/.ssh/merge_key -W %h:%p $admin\@jump.sphere-testbed.net";
 close($oh);
 # Create similar config for merge user
 my $mconfig = "/tmp/config";
@@ -190,7 +190,7 @@ Host *
     User $admin
     StrictHostKeyChecking no
     UserKnownHostsFile=/dev/null
-    ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i /home/merge/.ssh/merge_key -W %h:%p $admin\@jump.mod.deterlab.net";
+    ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i /home/merge/.ssh/merge_key -W %h:%p $admin\@jump.sphere-testbed.net";
 close($oh);
 # Figure out which cluster accounts we have created before
 my $org = $opt{'clusterOrg'};
@@ -303,7 +303,7 @@ Host *
      ServerAliveInterval 30
      User $admin
      StrictHostKeyChecking no
-     ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i ~/.ssh/merge_key -W %h:%p $admin\@jump.mod.deterlab.net";
+     ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i ~/.ssh/merge_key -W %h:%p $admin\@jump.sphere-testbed.net";
 close($oh);
 my $outtries = 0;
 my $success = 0;

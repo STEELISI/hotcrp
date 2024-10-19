@@ -73,7 +73,7 @@ my $vmtype = $ARGV[1];
 # Set server
 my $path=$opt{'webpath'} . "/secret";
 $ENV{HOME}=$path;
-my $cmd="mrg config set server grpc.mod.deterlab.net";
+my $cmd="mrg config set server grpc.sphere-testbed.net";
 system($cmd);
 # Call mrg update
 my $logincmd =  "mrg login " . $opt{'clusterUser'} . " -p \"" . $opt{'clusterPass'} . "\"";

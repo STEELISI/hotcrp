@@ -86,7 +86,7 @@ my $nodeID = $ARGV[3];
 # Set server
 my $path=$opt{'webpath'} . "/secret";
 $ENV{HOME}=$path;
-my $cmd="mrg config set server grpc.mod.deterlab.net";
+my $cmd="mrg config set server grpc.sphere-testbed.net";
 system($cmd);
 my $proj = $opt{'clusterOrg'} . "p" . $paperID;
 my $vmid = $vmtype . "." . $proj;
@@ -186,7 +186,7 @@ Host *
      ServerAliveInterval 30
      User $admin
      StrictHostKeyChecking no
-     ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i $path/.ssh/merge_key -W %h:%p $admin\@jump.mod.deterlab.net";
+     ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i $path/.ssh/merge_key -W %h:%p $admin\@jump.sphere-testbed.net";
 close($oh);
 # Create similar config for merge user
 my $mconfig = "/tmp/config";
@@ -198,7 +198,7 @@ Host *
     User $admin
     StrictHostKeyChecking no
     UserKnownHostsFile=/dev/null
-    ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i /home/merge/.ssh/merge_key -W %h:%p $admin\@jump.mod.deterlab.net";
+    ProxyCommand ssh -o StrictHostKeyChecking=no -p 2022 -i /home/merge/.ssh/merge_key -W %h:%p $admin\@jump.sphere-testbed.net";
 close($oh);
 my $output = `ps axuw | grep ssh | grep "localhost:$port " | wc | awk '{print \$1}'`;
 if ($output <= 1)

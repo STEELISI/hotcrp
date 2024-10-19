@@ -180,7 +180,7 @@ You can set up everything else through the web site itself.
 Extensions for using SPHERE
 ---------------------------
 
-Conference chair should create SPHERE account at https://launch.mod.deterlab.net/
+Conference chair should create SPHERE account at https://launch.sphere-testbed.net/
 and wait for it to be approved.
 Afterwards, go ahead and log in and create a new organization (e.g., acsac2024).
 It will have to be approved manually as well by testbed admins.
