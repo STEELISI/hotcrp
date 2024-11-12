@@ -1,0 +1,31 @@
+# Specify vnc password. This will run separate VNC terminal for each user on the machine
+password=$1
+apt update
+apt install -y tightvncserver icewm xterm expect
+cp /tmp/node/vncstart /usr/bin
+chmod a+rx /usr/bin/vncstart
+i=0
+users=`ls /home | sort`
+for user in $users; do
+    if [ "$user" == "test" ]; then
+	continue
+    fi
+    mkdir /home/$user/.vnc                             
+    chmod go-rwx /home/$user/.vnc
+    
+    # Set up VNC server terminal options
+    cp /tmp/node/xstartup /home/$user/.vnc
+    chmod a+rx /home/$user/.vnc/xstartup
+    mkdir /home/$user/.icewm
+    cp /tmp/node/startup /home/$user/.icewm
+    chmod a+rx /home/$user/.icewm/startup
+    chown $user:$user -R /home/$user/.icewm
+    chown $user:$user -R /home/$user/.vnc
+    # Start VNC server
+
+    # Configure VNC password
+    echo "/usr/bin/vncstart $user $password $i"
+    sudo -u $user /usr/bin/vncstart $user $password $i
+
+    i=$(($i+1))
+done
