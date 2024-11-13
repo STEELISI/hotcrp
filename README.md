@@ -1,3 +1,21 @@
+Extensions for using SPHERE
+---------------------------
+
+Conference chair should create SPHERE account at https://launch.sphere-testbed.net/
+and wait for it to be approved.
+Afterwards, go ahead and log in and create a new organization (e.g., acsac2024).
+It will have to be approved manually as well by testbed admins.
+
+Running "install" script should properly install everything for Apache. You
+will have to start novnc as root user once, so it can install websockify.
+Then populate "cluster" options in conf/options.php.
+
+If looking to adapt this to a different testbed, please look into changing
+files that have "vm" suffix, like "startvm", "consolevm", etc. 
+You will also need to run some version of "node-install" script on your
+testbed resources, after you allocate them. In SPHERE we do that by
+calling "runlab" utlity from "startvm". 
+
 HotCRP Conference Review Software [![Build Status](https://github.com/kohler/hotcrp/actions/workflows/tests.yml/badge.svg)](https://github.com/kohler/hotcrp/actions/workflows/tests.yml)
 =================================
 
@@ -177,17 +195,7 @@ You can set up everything else through the web site itself.
     precedence over option `$Opt["XXX"]`.
 
 
-Extensions for using SPHERE
----------------------------
 
-Conference chair should create SPHERE account at https://launch.sphere-testbed.net/
-and wait for it to be approved.
-Afterwards, go ahead and log in and create a new organization (e.g., acsac2024).
-It will have to be approved manually as well by testbed admins.
-
-Running "install" script should properly install everything for Apache. You
-will have to start novnc as root user once, so it can install websockify.
-Then populate "cluster" options in conf/options.php.
 
 Database access
 ---------------
